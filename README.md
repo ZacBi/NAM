@@ -9,3 +9,8 @@ Loading llava from hugging face: [liuhaotian/llava-v1.5-7b](https://huggingface.
 
 - [LLaVA](https://github.com/ZacBi/SNPA)
 - [Skill-Neuron](https://github.com/THU-KEG/Skill-Neuron)
+
+## Appendix
+
+- [huggingface mirror](https://hf-mirror.com/)
+- [modelscope](https://modelscope.cn/models)
