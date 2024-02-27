@@ -4,6 +4,7 @@
 
 from re import L
 from turtle import forward
+from httpx import get
 import torch
 import random
 from transformers import AutoModelForMaskedLM, AutoTokenizer, AdapterConfig, AutoModelWithLMHead, GPT2LMHeadModel, GPT2Tokenizer, AutoModelForPreTraining, AutoModelForCausalLM
@@ -179,3 +180,61 @@ class LlavaPrunePrompt(PromptBaseModel):
         parameter = self.state_dict()
         parameter["pos"] = self.pos
         torch.save(parameter, path + "-backbone")
+
+
+
+class MMUnderstander(torch.nn.Module):
+    """多模态理解器"""
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        # 映射器
+        self.mm_encoder = None
+        self.input_projector = None
+        self.backbone = None
+
+    def forward(self, sentences):
+        """forward函数
+
+        应该接受不同的输入形式, 例如文本, 图像, 音频等, 并返回对应的理解结果
+        """
+        pass
+
+    def getBackbone(self):
+        """获取理解器的骨干模型, 基本为大模型"""
+        pass
+
+class MEncoder(torch.nn.Module):
+    """模态编码器"""
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+
+class MProjector(torch.nn.Module):
+    """投影器, 用于将多模态理解器的输出投影到一个统一的空间中"""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+class InputProjector(MProjector):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+class OutputProjector(MProjector):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+
+
+class MGenerator(torch.nn.Module):
+    """多模态生成器"""
+    pass
+
+class ImagerGenerator(MGenerator):
+    """图像生成器"""
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+
+    def forward(self, sentences):
+        pass
