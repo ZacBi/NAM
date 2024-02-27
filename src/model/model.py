@@ -34,7 +34,7 @@ class BaseModel(torch.nn.Module):
 
     # NOTE: typo,  Verbalizer, 空间映射器
     def getverablizer(self):
-        """
+        """ 
         空间映射器，顶层模型继承时需要重写
         """
         args = self.args
