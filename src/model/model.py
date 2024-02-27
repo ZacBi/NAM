@@ -2,7 +2,10 @@
 # MODEL ZOO #
 #############
 
+from typing import Any
+from constant import Modality
 from re import L
+from token import STRING
 from turtle import forward
 from httpx import get
 import torch
@@ -183,26 +186,7 @@ class LlavaPrunePrompt(PromptBaseModel):
 
 
 
-class MMUnderstander(torch.nn.Module):
-    """多模态理解器"""
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-        # 映射器
-        self.mm_encoder = None
-        self.input_projector = None
-        self.backbone = None
 
-    def forward(self, sentences):
-        """forward函数
-
-        应该接受不同的输入形式, 例如文本, 图像, 音频等, 并返回对应的理解结果
-        """
-        pass
-
-    def getBackbone(self):
-        """获取理解器的骨干模型, 基本为大模型"""
-        pass
 
 class MEncoder(torch.nn.Module):
     """模态编码器"""
@@ -226,12 +210,67 @@ class OutputProjector(MProjector):
 
 
 
+class MMUnderstander(torch.nn.Module):
+    """多模态理解器"""
+
+    def __init__(self, args):
+        super().__init__()
+        self.word_embbeding = torch.nn.Module()
+        self.args = args
+        # 模态编码器
+        self.m_encoder = MEncoder(args)
+        # 输入投影器
+        self.input_projector = InputProjector(args)
+        self.backbone = torch.nn.Module()
+
+    def forward(self, **kwargs):
+        """forward函数
+
+        应该接受不同的输入形式, 例如文本, 图像, 音频等, 并返回对应的理解结果
+        :param type: 输入的类型, 例如文本, 图像, 音频等, 见枚举类
+        :param kwargs: 输入的数据, 从type中取值, 如果为文本, 则输入为语句, 其他的则用m_encoder
+
+        TODO: 看下python的枚举类
+        """
+        input_embeds = self.embed(kwargs['type'], kwargs['input'])
+        attention_mask = kwargs["attention_mask"]
+        outputs = self.backbone(input_embeds=input_embeds,
+                                attention_mask=attention_mask)
+        return outputs
+
+    def embed(self, type: str, input: Any) -> torch.Tensor:
+        """按类型取得对应的embedding, 该embedding为backbone的输入
+
+        Args:
+            type (str): 输入的类型, 例如文本, 图像, 音频等, 见枚举类
+            input (Any): 输入的数据, 如果是文本, 应为input_ids, 如果是图像, 应为图像的tensor, 如果是音频, 应为音频的tensor
+        """
+        # 搞个策略模式
+        if (type == Modality.TEXT.value):
+            return self.word_embbeding(input)
+        # elif
+
+        return torch.randn(1, 1)
+
+    def getBackbone(self):
+        """获取理解器的骨干模型, 基本为大模型"""
+        pass
+
 class MGenerator(torch.nn.Module):
     """多模态生成器"""
-    pass
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.output_projector = OutputProjector(args)
+        self.generator = torch.nn.Module()
+
+    def forward(self, embedding):
+        projection = self.output_projector(embedding)
+
+
 
 class ImagerGenerator(MGenerator):
     """图像生成器"""
+
     def __init__(self, args):
         super().__init__()
         self.args = args
