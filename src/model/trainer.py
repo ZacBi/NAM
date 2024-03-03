@@ -14,6 +14,8 @@ from transformers import get_linear_schedule_with_warmup
 from transformers.data.metrics import glue_compute_metrics
 from torch.utils.data import RandomSampler, DataLoader, SequentialSampler, Dataset
 
+from model.model import MMModel
+
 '''trainer class'''
 
 
@@ -40,9 +42,9 @@ class trainer:
         if ("Llava" in args.model_type):
             if ("Prompt" in args.model_type):
                 if ("Prune" in args.model_type):
-                    self.model = LlavaPrunePrompt(args)
+                    self.model = MMModel(args)
                 else:
-                    self.model = LlavaPrompt(args)
+                    self.model = MMModelPrune(args)
 
 
     # training step
@@ -239,7 +241,6 @@ class trainer:
                 hidden[n].append(output)
             return fn
         # NOTE: 参考https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_hook
-        # TODO: 另外这又是一个hardcode 12层的bert这里才有用，否则就没啥用
         # NOTE: [batch_size, promt_size, ]
         handle = [self.model.intermediate(n).register_forward_hook(
             forward_hook(n)) for n in range(12)]
@@ -440,3 +441,4 @@ class trainer:
             highlayer = self.args.highlayer
             type = self.args.type
             self.model.addmask(thspath, lowlayer, highlayer, type)
+

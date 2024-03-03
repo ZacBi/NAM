@@ -1,3 +1,4 @@
+from ast import parse
 import os
 import torch
 import random
@@ -6,6 +7,8 @@ import numpy as np
 from trainer import *
 from dataset import *
 
+TASK_TYPES = ['text2image', 'image2image', 'text2video']
+
 
 def main():
     # Arg Parsing
@@ -13,8 +16,6 @@ def main():
         description="Command line interface for Delta Tuning.")
     parser.add_argument("--model_type", default="LlavaPrompt",
                         type=str, help="type of model")
-    parser.add_argument("--prompt_size", default=16, type=int,
-                        help="how many words are used as prompting, when set to 0, degenerate to finetuning")
     parser.add_argument("-p", "--from_pretrained",
                         action="store_true", help="From Pretrained or Not")
     parser.add_argument("--load_backbone", default="", type=str,
@@ -22,12 +23,10 @@ def main():
     parser.add_argument("--save_to", type=str, default="")
     parser.add_argument("--resume_from", type=str, default="")
 
-    parser.add_argument("--task_type", default="sst2",
-                        type=str, help="Trained Task")
-    parser.add_argument("--data_path", default="",
-                        type=str, help="Path to the data")
-    parser.add_argument("--verb", default="", type=str,
-                        help="Verbalizers, seperating by commas")
+    parser.add_argument("--task_type", default="text2image", choices=TASK_TYPES,
+                        type=str, help="Trained Task Type")
+    parser.add_argument("--data_path", default="guangyil/laion-coco-aesthetic",
+                        type=str, help="Path to the data, default laion-coco")
 
     parser.add_argument("--device", default="cuda:0", type=str)
     parser.add_argument("--random_seed", default=0,
@@ -42,7 +41,31 @@ def main():
     parser.add_argument("--early_stop", action="store_true",
                         help="whether apply early stopping")
 
+    parser.add_argument("--encoder_model_pth",
+                        default="", help="encoder path")
+    parser.add_argument("--generator_model_pth",
+                        default="", help="generator path")
+    parser.add_argument("--backbone_model_pth",
+                        default="", help="backbone path")
+    parser.add_argument("--input_projector_type",
+                        default="mlp", help="input projector type")
+    parser.add_argument("--input_projector_depth", default=1, type=int,
+                        help="input projector depth, effective only when input_projector_type is mlp")
+    parser.add_argument("--output_projector_type",
+                        default="mlp", help="output projector type")
+    parser.add_argument("--output_projector_depth", default=1, type=int,
+                        help="output projector depth, effective only when output_projector_type is mlp")
+
     args = parser.parse_args()
+
+    # Process sub args
+    # split by 'to'(2)
+    task_type = args.task_type.split('2')
+    args.input_type = task_type[0]
+    args.output_type = task_type[1]
+
+    # 先默认写llama, 后面根据backbone_model_pth来分析
+    args.backbone_type = 'llama'
 
     # Randomness Fixing
     seed = args.random_seed
@@ -55,8 +78,7 @@ def main():
 
     # Data Preperation
     args.task_type = args.task_type.lower()
-    train, valid, test = getDataset(args.task_type, args.data_path)
-    args.num_labels = datasetLabel[args.task_type]
+    train, valid, test = getDataset(args)
 
     # Preprocessing args
     args.verb = args.verb.split(",")
