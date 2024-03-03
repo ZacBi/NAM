@@ -11,7 +11,7 @@ from diffusers import AutoPipelineForText2Image
 from torch import nn
 from transformers import (AutoModelForCausalLM, AutoModelForMaskedLM,
                           AutoModelForPreTraining, AutoModelWithLMHead,
-                          AutoTokenizer, GPT2LMHeadModel, GPT2Tokenizer)
+                          AutoTokenizer, GPT2LMHeadModel, GPT2Tokenizer, RobertaModel)
 from transformers.activations import ACT2FN
 
 modelpath = "/data/MODELS/"
@@ -237,6 +237,7 @@ class MMGenerator(nn.Module):
 class MMModel(nn.Module):
     r"""Multi-Modality model
     """
+
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -253,10 +254,11 @@ class MMModel(nn.Module):
         input_embeds = self.mm_understander(inputs)
         outputs = self.mm_generator(input_embeds)
         return outputs
+
     def intermediate(self, n) -> nn.Module:
         if self.config.backbone_type == 'llama':
             # llama的层数由num_hidden_layers决定, 所有的backbone的层数都需要前置到config里面
-            return self.mm_understander.backbone.layers[n].mlp;
+            return self.mm_understander.backbone.layers[n].mlp
         return nn.Module()
 
     def _register_itermediate_forward_hook(self, fn):
@@ -269,11 +271,13 @@ class MMModel(nn.Module):
 #####################
 
 class FastVerifyText2ImageMMModel(nn.Module):
+    """取默认配置即可"""
     def __init__(self, config) -> None:
         super().__init__(config)
-        AutoPipelineForText2Image.from_pretrained(config)
+        # sd 原生自带CLIPTextModel, 不需要再引入bert, 可以替换为One-peace
+        self.pipeline = AutoPipelineForText2Image.from_pretrained(
+            config.generator_model_pth, torch_dtype=torch.float16, variant="fp16").to('cuda')
 
-    def foward(self):
-        pass
-
-func 
+    def foward(self, sentence: str):
+        outputs = self.pipeline(sentence)
+        return outputs.images[0]
