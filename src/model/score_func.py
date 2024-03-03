@@ -22,11 +22,11 @@ class Text2ImageScore:
         if self.config.backbone_type == 'llama':
             # llama的outputs中的hidden_states 即为每一层的 mlp的输出可以直接使用
             # 直接取每一层的gradient * hiden_states
-
             for layer_idx in self.config.num_hidden_layers:
-                score[layer_idx] = torch.prod(backbone_hidden_states[layer_idx], model.intermediate(
-                    layer_idx).grad)
-        return []
+                # 重置梯度
+                model.zero_grad()
+                score[layer_idx] = torch.matmul(backbone_hidden_states[layer_idx], torch.autograd.grad(final_outputs, backbone_hidden_states[layer_idx])[0])
+        return score
 
     def text_2_image_activation_score(self, loss, model):
         """pixel activattion score"""
