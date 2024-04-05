@@ -29,9 +29,9 @@ def main():
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    
+
     if(not os.path.exists(args.save_to)):
-        os.makedirs(args.save_to)    
+        os.makedirs(args.save_to)
 
 
 

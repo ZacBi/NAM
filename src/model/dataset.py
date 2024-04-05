@@ -7,7 +7,7 @@ from torch.utils.data import random_split as split
 # type: ignore
 def getDataset(args) -> tuple[Dataset, Dataset, Dataset]:  # type: ignore
     if args.task_type == 'text2image':
-        dataset : DatasetDict= load_dataset(args.data_path)
+        dataset: DatasetDict = load_dataset(args.data_path)
         # 90% train, 10% test + validation
         train_test_valid = dataset['train'].train_test_split(test_size=0.1)
         # Split the 10% test + valid in half test, half valid

@@ -14,7 +14,7 @@ from transformers import get_linear_schedule_with_warmup
 from transformers.data.metrics import glue_compute_metrics
 from torch.utils.data import RandomSampler, DataLoader, SequentialSampler, Dataset
 
-from model.model import MMModel
+from model.model import MMModel, MMModelPrune
 
 '''trainer class'''
 
@@ -39,15 +39,15 @@ class trainer:
     def getModel(self):
         # Getting the required model
         args = self.args
-        if ("Llava" in args.model_type):
+        if ("llama" in args.model_type):
             if ("Prompt" in args.model_type):
                 if ("Prune" in args.model_type):
-                    self.model = MMModel(args)
-                else:
                     self.model = MMModelPrune(args)
-
+                else:
+                    self.model = MMModel(args)
 
     # training step
+
     def mlm_train_step(self, labeled_batch, return_length=False) -> torch.Tensor:
         """Perform a MLM training step."""
         sentences = labeled_batch[datasetRow[self.args.task_type][0]]
@@ -441,4 +441,3 @@ class trainer:
             highlayer = self.args.highlayer
             type = self.args.type
             self.model.addmask(thspath, lowlayer, highlayer, type)
-

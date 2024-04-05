@@ -55,6 +55,7 @@ def main():
                         default="mlp", help="output projector type")
     parser.add_argument("--output_projector_depth", default=1, type=int,
                         help="output projector depth, effective only when output_projector_type is mlp")
+    parser.add_argument("--backbone_type", default="llama",help="backbone type")
 
     args = parser.parse_args()
 
@@ -64,8 +65,6 @@ def main():
     args.input_type = task_type[0]
     args.output_type = task_type[1]
 
-    # 先默认写llama, 后面根据backbone_model_pth来分析
-    args.backbone_type = 'llama'
 
     # Randomness Fixing
     seed = args.random_seed
@@ -81,7 +80,6 @@ def main():
     train, valid, test = getDataset(args)
 
     # Preprocessing args
-    args.verb = args.verb.split(",")
     if (not os.path.exists(args.save_to)):
         os.makedirs(args.save_to)
 

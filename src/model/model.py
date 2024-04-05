@@ -7,7 +7,7 @@ from typing import Any
 
 import torch
 from constant import Modality
-from diffusers import AutoPipelineForText2Image
+from diffusers.pipelines.auto_pipeline import AutoPipelineForText2Image
 from torch import nn
 from transformers import (AutoModelForCausalLM, AutoModelForMaskedLM,
                           AutoModelForPreTraining, AutoModelWithLMHead,
@@ -265,6 +265,31 @@ class MMModel(nn.Module):
         for layer_idx in self.config.num_hidden_layers:
             self.intermediate(layer_idx).register_forward_hook(fn)
 
+
+class MMModelPrune(MMModel):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(self, inputs):
+        """forward函数
+
+        应该接受不同的输入形式, 例如文本, 图像, 音频等, 并返回对应的理解结果
+        :param type: 输入的类型, 例如文本, 图像, 音频等, 见枚举类
+        :param kwargs: 输入的数据, 从type中取值, 如果为文本, 则输入为语句, 其他的则用m_encoder
+        """
+        input_embeds = self.mm_understander(inputs)
+        outputs = self.mm_generator(input_embeds)
+        return outputs
+
+    def intermediate(self, n) -> nn.Module:
+        if self.config.backbone_type == 'llama':
+            # llama的层数由num_hidden_layers决定, 所有的backbone的层数都需要前置到config里面
+            return self.mm_understander.backbone.layers[n].mlp
+        return nn.Module()
+
+    def _register_itermediate_forward_hook(self, fn):
+        for layer_idx in self.config.num_hidden_layers:
+            self.intermediate(layer_idx).register_forward_hook(fn)
 
 #####################
 # FAST VERIFICATION #
