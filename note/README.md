@@ -4,10 +4,16 @@ clip = GILL
 
 ## TODO
 
--[ ] 加师弟git权限 分支代码一定要写在trial分支上
--[ ] eva的参考资料和模型文件给师弟
--[ ] coco2017 的数据集都给师弟
--[ ] poetry文件打包好，让师弟安装好（可能）
+- 加师弟git权限 分支代码一定要写在trial分支上
+  - 分支clone: git clone git@github.com:ZacBi/SNPA.git
+    - 如果clone失败， 参考[配置ssh连接git](https://www.cnblogs.com/OnlyAR/p/16155406.html)
+  - 切换到分支上: git checkout trial
+- eva的参考资料和模型文件给师弟
+  - follow eva的[setup](https://github.com/baaivision/EVA/blob/master/EVA-02/det/README.md)
+  - eva的[modelscope模型文件](https://www.modelscope.cn/models/zacbi2023/eva02/summary)
+- coco2017 的数据集都给师弟
+  - [数据集地址](https://www.modelscope.cn/datasets/zacbi2023/coco2017_caption/summary)
+- poetry文件打包好，让师弟安装好（废弃）
 
 ## 5.1
 
