@@ -13,9 +13,11 @@ clip = GILL
   - eva的[modelscope模型文件](https://www.modelscope.cn/models/zacbi2023/eva02/summary)
 - coco2017 的数据集都给师弟
   - [数据集地址](https://www.modelscope.cn/datasets/zacbi2023/coco2017_caption/summary)
+- modelscope使用方式: [modelscope doc](https://www.modelscope.cn/docs/%E9%A6%96%E9%A1%B5)
 - poetry文件打包好，让师弟安装好（废弃）
 
 ## 5.1
+
 
 - clip + eva跑通
   - online：模型架构拼接在一起，跑通
