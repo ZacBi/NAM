@@ -18,7 +18,6 @@ cryptacular==1.6.2
 cryptography==42.0.5
 cycler==0.12.1
 datasets==2.18.0
--e git+https://github.com/baaivision/EVA.git@2ca37a8c0d82b9496754f3fa9c3966b4caa54d75#egg=detectron2&subdirectory=EVA-02/det
 dill==0.3.8
 docker-pycreds==0.4.0
 einops==0.8.0
