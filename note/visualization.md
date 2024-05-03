@@ -1,0 +1,7 @@
+- sd的hf实现:[diffusers](https://github.com/huggingface/diffusers)
+- [The Illustrated Stable Diffusion](https://jalammar.github.io/illustrated-stable-diffusion/)
+- CV可解释:
+  - 可解释方法集合: [https://jacobgil.github.io/pytorch-gradcam-book/introduction.html](https://jacobgil.github.io/pytorch-gradcam-book/introduction.html)
+  - [Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization](https://arxiv.org/pdf/1610.02391)
+- [diffusers-interpret](https://github.com/JoaoLages/diffusers-interpret?tab=readme-ov-file)
+- google:  [explainability for stable diffusion](https://www.google.com.hk/search?q=explainability+for+stable+diffusion&sca_esv=4798f66b03e5dfbb&sxsrf=ACQVn08DavTZgFtR8ePGAlnmnr7HZn7Zpg%3A1714720890501&source=hp&ei=epA0Zty5HNaavr0Ps-aRyAo&iflsig=ANes7DEAAAAAZjSeisnwZk7qcD7RjUOBB2OcPr5Dfjhm&ved=0ahUKEwjc3sKM-fCFAxVWja8BHTNzBKkQ4dUDCBU&uact=5&oq=explainability+for+stable+diffusion&gs_lp=Egdnd3Mtd2l6IiNleHBsYWluYWJpbGl0eSBmb3Igc3RhYmxlIGRpZmZ1c2lvbjIFECEYoAFI-ipQAFiaJ3ABeACQAQCYAe8CoAGbIaoBCDAuMjEuMC4zuAEDyAEA-AEC-AEBmAIWoAL_HcICBRAAGIAEwgILEAAYgAQYkQIYigXCAgoQABiABBgUGIcCwgIIEAAYgAQYywHCAgcQABiABBgNwgIGEAAYFhgewgILEAAYgAQYhgMYigXCAgcQIRigARgKmAMAkgcIMS4xOC4wLjOgB8hn&sclient=gws-wiz)
