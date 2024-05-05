@@ -2,14 +2,10 @@ import logging
 from os import path
 from typing import List, Optional, Tuple, Union
 
+import accelerate
 import torch
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import LazyConfig, instantiate
-from detectron2.data import MetadataCatalog
-from detectron2.data.detection_utils import read_image
-from detectron2.engine.defaults import DefaultPredictor
-from detectron2.utils.video_visualizer import VideoVisualizer
-from detectron2.utils.visualizer import ColorMode, Visualizer
 from diffusers import AutoPipelineForText2Image, DiffusionPipeline
 from diffusers_interpret import StableDiffusionPipelineExplainer
 from diffusers_interpret.data import (
@@ -17,8 +13,10 @@ from diffusers_interpret.data import (
     PipelineExplainerForBoundingBoxOutput, PipelineExplainerOutput,
     PipelineImg2ImgExplainerForBoundingBoxOutputOutput,
     PipelineImg2ImgExplainerOutput)
+from diffusers_interpret.generated_images import GeneratedImages
 from modelscope.hub.snapshot_download import snapshot_download
 from PIL.Image import Image
+from detectron2.data.detection_utils import read_image, convert_PIL_to_numpy
 
 # logger
 logger = logging.getLogger(__name__)
@@ -88,9 +86,21 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         # clone and detach
         image = image.clone().detach()
         height, width = image.shape[:2]
-        image = image.permute(2, 0, 1)
+        # transform image to PIL type to adapt the input of detect model
+        all_images = GeneratedImages(
+            all_generated_images=[image],
+            pipe=self.pipe,
+            remove_batch_dimension=True,
+            prepare_image_slider=False
+        )
+
+        image = torch.as_tensor(convert_PIL_to_numpy(
+            all_images[-1], format="BGR").astype("float32").transpose(2, 0, 1))
+
         inputs = {"image": image, "height": height, "width": width}
         predictions = self.det_model([inputs])[0]
+        # offload det_model to cpu for saving gpu memory
+        accelerate.cpu_offload(self.det_model)
 
         instances = predictions['instances']
         pred_masks = instances.pred_masks
@@ -216,7 +226,7 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def infer(self, prompt: str = 'A cat sits on the chair', target_cls_id = 15):
+    def infer(self, prompt: str = 'A cat sits on the chair', target_cls_id=15):
         """
             target_cls_id = 15 为 cat
             # 1. sd 向前传播
@@ -224,7 +234,8 @@ class Trainer:
             # 3. sd-interpret根据mask进行归因
         """
 
-        explainer = StableDiffusionPipelineDetExplainer(self.sd_pipeline, det_model = self.det_model)
+        explainer = StableDiffusionPipelineDetExplainer(
+            self.sd_pipeline, det_model=self.det_model)
         with torch.autocast('cuda'):
             output = explainer(
                 prompt,
