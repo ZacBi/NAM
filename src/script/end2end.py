@@ -179,6 +179,7 @@ class Trainer:
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+        self.download_model()
         self.prepare_stable_diffusion()
         self.prepare_eva()
 
@@ -199,7 +200,7 @@ class Trainer:
         eva_config_path = path.join(eva_base_path, eva_coco_config_rpath)
 
         # replace with your eva02 weights path
-        eva_coco_weights_rpth = 'checkpoints/eva_L_coco_seg_sys_o365.pth'
+        eva_coco_weights_rpth = 'checkpoints/eva02_L_coco_seg_sys_o365.pth'
         eva_weights_path = path.join(eva_base_path, eva_coco_weights_rpth)
 
         custum_cfg = ['MODEL.RETINANET.SCORE_THRESH_TEST', 0.5,
@@ -215,19 +216,21 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def infer(self, prompt: str = 'A cat sits on the chair'):
-        # 1. sd 向前传播
+    def infer(self, prompt: str = 'A cat sits on the chair', target_cls_id = 15):
+        """
+            target_cls_id = 15 为 cat
+            # 1. sd 向前传播
+            # 2. eva图像分割获取目标区域mask
+            # 3. sd-interpret根据mask进行归因
+        """
 
-        # 2. eva图像分割获取目标区域mask
-
-        # 3. sd-interpret根据mask进行归因
-        explainer = StableDiffusionPipelineDetExplainer(self.sd_pipeline)
+        explainer = StableDiffusionPipelineDetExplainer(self.sd_pipeline, det_model = self.det_model)
         with torch.autocast('cuda'):
             output = explainer(
                 prompt,
                 num_inference_steps=50,
                 n_last_diffusion_steps_to_consider_for_attributions=1,
-                target_cls_id=1
+                target_cls_id=target_cls_id
             )
         return output
 
@@ -235,6 +238,7 @@ class Trainer:
 def main():
     trainer = Trainer()
     output = trainer.infer()
+    return output
 
 
 if __name__ == "__main__":
