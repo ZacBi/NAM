@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 from datetime import datetime
 import json
+import csv
 
 import accelerate
 import torch
@@ -112,7 +113,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
         mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
         # 扩张到和image同样的维度
-        return mask.unsqueeze(0).repeat(channel, 1, 1)
+        return mask.unsqueeze(0).repeat(channel, 1, 1).permute(1, 2, 0)
 
     def gradients_attribution(
         self,
@@ -217,8 +218,12 @@ class Trainer:
         file_prefix = path.join(self.data_path, 'image/{file_name}/{image_name}'.format(file_name=curr_file_name, image_name=formatted_time))
         output.image.save(file_prefix + '.png')
         logger.info("save image file to {}".format(file_prefix + '.png'))
-        with open(file_prefix + '.json', 'w', encoding='utf-8') as file:
-            json.dump(output.token_attributions, file, ensure_ascii=False, indent=4)
+        with open(file_prefix + '.csv', 'w', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['token', 'attribution/score'])
+            # for token, score in output.token_attributions:
+            for item in output.token_attributions:
+                writer.writerow(item)
             logger.info("save json file to {}".format(file_prefix + '.json'))
         
 
@@ -278,7 +283,7 @@ class Trainer:
 def main():
     prompt = "An orange striped tabby cat laying on top of a red vehicle's wheel."
     trainer = Trainer()
-    output = trainer.infer(prompt, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 2)
+    output = trainer.infer(prompt, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 1)
     trainer.postprocess(output)
 
 
