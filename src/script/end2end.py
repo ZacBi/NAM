@@ -112,7 +112,8 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         assert len(pred_logits.shape) == 3
         if explanation_2d_bounding_box:
             upper_left, bottom_right = explanation_2d_bounding_box
-            pred_logits = pred_logits[upper_left[0]: bottom_right[0], upper_left[1]: bottom_right[1], :]
+            pred_logits = pred_logits[upper_left[0]
+                : bottom_right[0], upper_left[1]: bottom_right[1], :]
 
         assert len(input_embeds) == len(attribution_algorithms)
 
@@ -178,8 +179,8 @@ class Trainer:
         self.torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    def train(self):
-        pass
+        self.prepare_stable_diffusion()
+        self.prepare_eva()
 
     def download_model(self):
         model_ids = [self.sd_id, self.eva_id]
@@ -214,17 +215,26 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def forward(self):
+    def infer(self, prompt: str = 'A cat sits on the chair'):
         # 1. sd 向前传播
 
         # 2. eva图像分割获取目标区域mask
 
         # 3. sd-interpret根据mask进行归因
-        pass
+        explainer = StableDiffusionPipelineDetExplainer(self.sd_pipeline)
+        with torch.autocast('cuda'):
+            output = explainer(
+                prompt,
+                num_inference_steps=50,
+                n_last_diffusion_steps_to_consider_for_attributions=1,
+                target_cls_id=1
+            )
+        return output
 
 
 def main():
-    pass
+    trainer = Trainer()
+    output = trainer.infer()
 
 
 if __name__ == "__main__":
