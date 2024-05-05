@@ -1,6 +1,10 @@
 import logging
 from os import path
+import os
 from typing import List, Optional, Tuple, Union
+
+from datetime import datetime
+import json
 
 import accelerate
 import torch
@@ -85,7 +89,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
 
         # clone and detach
         image = image.clone().detach()
-        height, width = image.shape[:2]
+        height, width, channel = image.shape
         # transform image to PIL type to adapt the input of detect model
         all_images = GeneratedImages(
             all_generated_images=[image],
@@ -105,7 +109,10 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         instances = predictions['instances']
         pred_masks = instances.pred_masks
         pred_classes = instances.pred_classes
-        return torch.any(pred_masks[pred_classes == target_cls_id])
+        # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
+        mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
+        # 扩张到和image同样的维度
+        return mask.unsqueeze(0).repeat(channel, 1, 1)
 
     def gradients_attribution(
         self,
@@ -193,6 +200,28 @@ class Trainer:
         self.prepare_stable_diffusion()
         self.prepare_eva()
 
+    def postprocess(self, output):
+
+        now = datetime.now()
+        formatted_time = now.strftime('%Y%m%d%H%M%S%f')[:-3]
+        curr_file_name = path.splitext(path.basename(__file__))[0]
+        file_dir = path.join(self.data_path, 'image/{}'.format(curr_file_name))
+
+        if not path.exists(file_dir):
+            # 如果目录不存在，则创建它
+            os.makedirs(file_dir, exist_ok=True)
+            print(f"目录 {file_dir} 已创建。")
+        else:
+            print(f"目录 {file_dir} 已存在，无需创建。")
+
+        file_prefix = path.join(self.data_path, 'image/{file_name}/{image_name}'.format(file_name=curr_file_name, image_name=formatted_time))
+        output.image.save(file_prefix + '.png')
+        logger.info("save image file to {}".format(file_prefix + '.png'))
+        with open(file_prefix + '.json', 'w', encoding='utf-8') as file:
+            json.dump(output.token_attributions, file, ensure_ascii=False, indent=4)
+            logger.info("save json file to {}".format(file_prefix + '.json'))
+        
+
     def download_model(self):
         model_ids = [self.sd_id, self.eva_id]
         for model_id in model_ids:
@@ -226,30 +255,31 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def infer(self, prompt: str = 'A cat sits on the chair', target_cls_id=15):
+    def infer(self, prompt: str, target_cls_id: int, num_inference_steps = 50, n_last_diffusion_steps_to_consider_for_attributions = 5):
         """
             target_cls_id = 15 为 cat
+            n_last_diffusion_steps_to_consider_for_attributions 这个参数需要check，判断上下界
             # 1. sd 向前传播
             # 2. eva图像分割获取目标区域mask
             # 3. sd-interpret根据mask进行归因
         """
-
         explainer = StableDiffusionPipelineDetExplainer(
-            self.sd_pipeline, det_model=self.det_model)
+            self.sd_pipeline, det_model=self.eva)
         with torch.autocast('cuda'):
             output = explainer(
                 prompt,
-                num_inference_steps=50,
-                n_last_diffusion_steps_to_consider_for_attributions=1,
+                num_inference_steps=num_inference_steps,
+                n_last_diffusion_steps_to_consider_for_attributions=n_last_diffusion_steps_to_consider_for_attributions,
                 target_cls_id=target_cls_id
             )
         return output
 
 
 def main():
+    prompt = "An orange striped tabby cat laying on top of a red vehicle's wheel."
     trainer = Trainer()
-    output = trainer.infer()
-    return output
+    output = trainer.infer(prompt, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 2)
+    trainer.postprocess(output)
 
 
 if __name__ == "__main__":
