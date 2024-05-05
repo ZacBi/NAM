@@ -77,12 +77,11 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
 
         return output
 
-    
     def _mask_target_cls(self, image: torch.Tensor, target_cls_id: int) -> torch.Tensor:
         """
             use detect model to mask the target cls
         """
-        if target_cls_id == -1:
+        if target_cls_id == -1 or self.det_model is None:
             # 返回一个identity矩阵
             return torch.ones_like(image, dtype=torch.bool)
 
@@ -91,13 +90,20 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         height, width = image.shape[:2]
         image = image.permute(2, 0, 1)
         inputs = {"image": image, "height": height, "width": width}
+        predictions = self.det_model([inputs])[0]
+
+        instances = predictions['instances']
+        pred_masks = instances.pred_masks
+        pred_classes = instances.pred_classes
+        return torch.any(pred_masks[pred_classes == target_cls_id])
 
     def gradients_attribution(
         self,
         pred_logits: torch.Tensor,
         input_embeds: Tuple[torch.Tensor],
         attribution_algorithms: List[AttributionAlgorithm],
-        explanation_2d_bounding_box: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
+        explanation_2d_bounding_box: Optional[Tuple[Tuple[int,
+                                                          int], Tuple[int, int]]] = None,
         retain_graph: bool = False,
         target_cls_id: int = -1
     ) -> List[torch.Tensor]:
@@ -106,19 +112,22 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         assert len(pred_logits.shape) == 3
         if explanation_2d_bounding_box:
             upper_left, bottom_right = explanation_2d_bounding_box
-            pred_logits = pred_logits[upper_left[0]
-                : bottom_right[0], upper_left[1]: bottom_right[1], :]
+            pred_logits = pred_logits[upper_left[0]: bottom_right[0], upper_left[1]: bottom_right[1], :]
 
         assert len(input_embeds) == len(attribution_algorithms)
+
+        # get mask matrix for target class
+        traget_mask = self._mask_target_cls(pred_logits, target_cls_id)
 
         # Construct tuple of scalar tensors with all `pred_logits`
         # The code below is equivalent to `tuple_of_pred_logits = tuple(torch.flatten(pred_logits))`,
         #  but for some reason the gradient calculation is way faster if the tensor is flattened like this
         tuple_of_pred_logits = []
-        for x in pred_logits:
-            for y in x:
-                for z in y:
-                    tuple_of_pred_logits.append(z)
+        for px, mx in zip(pred_logits, traget_mask):
+            for py, my in zip(px, mx):
+                for pz, mz in zip(py, my):
+                    if mz:
+                        tuple_of_pred_logits.append(pz)
         tuple_of_pred_logits = tuple(tuple_of_pred_logits)
 
         # get the sum of back-prop gradients for all predictions with respect to the inputs
