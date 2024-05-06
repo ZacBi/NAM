@@ -62,14 +62,11 @@ class GILLModel(nn.Module):
     
     if 'facebook/opt' in opt_version:
       # 加载经过预训练的LM
-      print("8\n")
       # self.lm = OPTForCausalLM.from_pretrained(opt_version)
-      self.lm = OPTForCausalLM.from_pretrained(pretrained_model_name_or_path="transformer_cache/opt")
-      print("9\n")
+      self.lm = OPTForCausalLM.from_pretrained(pretrained_model_name_or_path="/data/ruip/eva02/gill-main_2/transformer_cache/opt")
     else:
       raise NotImplementedError
     self.opt_version = opt_version
-    print("8\n")
     if self.args.freeze_lm:
       self.lm.eval()
       print("Freezing the LM.")
@@ -92,10 +89,9 @@ class GILLModel(nn.Module):
     # vision-model其实就是visual-encoder：加载模型；提取出模型的隐藏层维度
     print("Restoring pretrained weights for the visual model.")
     if 'clip' in visual_encoder:
-      self.visual_model = CLIPVisionModel.from_pretrained("transformer_cache/visual")
+      self.visual_model = CLIPVisionModel.from_pretrained("/data/ruip/eva02/gill-main_2/transformer_cache/visual")
     else:
       self.visual_model = AutoModel.from_pretrained(visual_encoder)
-    print("10\n")
     if 'clip' in visual_encoder:
       hidden_size = self.visual_model.config.hidden_size
     else:
@@ -108,7 +104,6 @@ class GILLModel(nn.Module):
         param.requires_grad = False
     else:
       self.visual_model.train()
-    print("11\n")
     self.visual_model_name = visual_encoder
     # 这里应该是编码的维度（对于视觉tokens，是不是image_token? 这里算出来的是embedding矩阵的参数数量：嵌入向量的维度×标记个数）
     # 是如何处理输入的tokens数量不同的情况；嵌入矩阵只有一个的前提下；？？？？
@@ -118,7 +113,6 @@ class GILLModel(nn.Module):
     self.ret_text_hidden_fcs = nn.ModuleList([])
     self.gen_text_hidden_fcs = nn.ModuleList([])
     # {layer_idx} 和 {self.lm.config.num_hidden_layers} 是变量，分别表示请求的层索引和模型实际拥有的隐藏层数量
-    print("12\n")
     for layer_idx in self.args.text_emb_layers:
       # （层索引为-1）或者（层索引应景等于实际拥有的隐藏层的数量（这里不是从0开始的吗？）；不是bert模型）
       if (layer_idx == -1 or layer_idx == self.lm.config.num_hidden_layers) and ('bert' not in opt_version):
@@ -588,13 +582,11 @@ class GILL(nn.Module):
     self.num_gen_images = num_gen_images
     self.idx2dec = {0: 'gen', 1: 'ret', 2: 'same'}
     self.decision_model = None
-    print("13\n")
     # Load the Stable Diffusion model.
     if load_sd:
       model_id = "runwayml/stable-diffusion-v1-5"
       # self.sd_pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16).to("cuda")
-      self.sd_pipe = StableDiffusionPipeline.from_pretrained("transformer_cache/stable-diffusion-v1-5", torch_dtype=torch.float16).to("cuda")
-    print("14\n")
+      self.sd_pipe = StableDiffusionPipeline.from_pretrained("/data/ruip/eva02/gill-main_2/transformer_cache/stable-diffusion-v1-5", torch_dtype=torch.float16).to("cuda")
     if decision_model_path is not None:
       print('Loading decision model...')
       self.decision_model = nn.Sequential(*[
@@ -732,15 +724,18 @@ class GILL(nn.Module):
       if len(all_ret_idx) == 0:
         # No [IMG] tokens.
         caption = self.model.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        print("caption:", caption)
         return_outputs.append(utils.truncate_caption(caption))
+      # has [IMG] tokens
       else:
 
         for ret_idx in all_ret_idx:
           assert generated_ids[0, ret_idx:ret_idx+self.model.num_tokens].cpu().detach().numpy().tolist() == self.model.retrieval_token_idx, (generated_ids[0, ret_idx:ret_idx+self.model.num_tokens], self.model.retrieval_token_idx)
           # 这里时专门从embeddings中得到的img_tokens的编码
+          print("ret_idx", ret_idx)
           raw_emb = embeddings[:, ret_idx:ret_idx+self.model.num_tokens, :]  # (1, 8, 4096)
           assert len(self.model.args.text_emb_layers) == 1
-
+          # 创建一个字典 image_outputs，用于存储生成的图像、检索得分等信息
           image_outputs = {
             'gen': [],
             'ret': [],
@@ -893,7 +888,6 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
   model_args_path = os.path.join(model_dir, 'model_args.json')
   model_ckpt_path = os.path.join(model_dir, 'pretrained_ckpt.pth.tar')
   embs_paths = [s for s in glob.glob(os.path.join(model_dir, 'cc3m*.npy'))]
-  print("1\n")
   if not os.path.exists(model_args_path):
     raise ValueError(f'model_args.json does not exist in {model_dir}.')
   if not os.path.exists(model_ckpt_path):
@@ -901,6 +895,7 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
   if not load_ret_embs or len(embs_paths) == 0:
     if len(embs_paths) == 0:
       print(f'cc3m.npy files do not exist in {model_dir}.')
+    # 模型没有索引。这是什么意思
     print('Running the model without retrieval.')
     path_array, emb_matrix = None, None
   else:
@@ -908,29 +903,26 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
     # Construct embedding matrix for nearest neighbor lookup.
     path_array = []
     emb_matrix = []
-    print("2\n")
     # These were precomputed for all CC3M images with `model.get_visual_embs(image, mode='retrieval')`.
     for p in embs_paths:
       with open(p, 'rb') as wf:
           train_embs_data = pkl.load(wf)
           path_array.extend(train_embs_data['paths'])
           emb_matrix.extend(train_embs_data['embeddings'])
+    # emb_matrix 列表中的嵌入信息沿着指定的轴（axis=0，沿着行方向）堆叠成一个数组，最终得到一个二维数组，其中每行代表一个图像的嵌入向量
     emb_matrix = np.stack(emb_matrix, axis=0)
-    print("3\n")
     # Number of paths should be equal to number of embeddings.
     assert len(path_array) == emb_matrix.shape[0], (len(path_array), emb_matrix.shape)
 
   with open(model_args_path, 'r') as f:
     model_kwargs = json.load(f)
-  print("4\n")
   # Initialize tokenizer.
   # tokenizer = AutoTokenizer.from_pretrained(model_kwargs['opt_version'], use_fast=False)
-  tokenizer = AutoTokenizer.from_pretrained("transformer_cache/opt")
+  tokenizer = AutoTokenizer.from_pretrained("/data/ruip/eva02/gill-main_2/transformer_cache/opt")
   if tokenizer.pad_token is None:
       tokenizer.pad_token_id = tokenizer.eos_token_id
   # Add an image token for loss masking (and visualization) purposes.
   tokenizer.add_special_tokens({"cls_token": "<|image|>"})  # add special image token to tokenizer
-  print("5\n")
   # Add [IMG] tokens to the vocabulary.
   model_kwargs['retrieval_token_idx'] = []
   for i in range(model_kwargs['num_tokens']):
@@ -951,15 +943,41 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
     decision_model_path = os.path.join(model_dir, decision_model_fn)
   else:
     decision_model_path = None
-  print("6\n")
   # Initialize model for inference.
   model = GILL(tokenizer, args, path_array=path_array, emb_matrix=emb_matrix,
-               load_sd=True, num_gen_images=1, decision_model_path=decision_model_path)
+               load_sd=True, num_gen_images=1, decision_model_path=decision_model_path)         
+  # model = torch.nn.DataParallel(model, device_ids=[0])
+  # if isinstance(model,torch.nn.DataParallel):
+	# 	  model = model.module  
   model = model.eval()
   model = model.bfloat16()
   model = model.cuda()
-  print("7\n")
   # Load pretrained linear mappings and [IMG] embeddings.
+  # 加载模型的检查点文件，将其保存在 checkpoint 中
+  checkpoint = torch.load(model_ckpt_path)
+  # 创建一个空字典 state_dict，用于存储模型的状态字典
+  state_dict = {}
+  # This is needed if we train with DDP.
+  for k, v in checkpoint['state_dict'].items():
+      state_dict[k.replace('module.', '')] = v
+  # 获取模型输入嵌入层的权重，将其从 GPU 移动到 CPU，并且返回其副本，这里得到了 [IMG] 嵌入的权重
+  img_token_embeddings = state_dict['model.input_embeddings.weight'].cpu().detach()
+  # 从 state_dict 中删除键为 'model.input_embeddings.weight' 的条目，因为这部分在后续加载模型参数时会重新设定
+  del state_dict['model.input_embeddings.weight']
+  # 使用加载的 state_dict 更新模型的参数，strict=False 表示允许不严格匹配参数形状
+  model.load_state_dict(state_dict, strict=False)
+  # Copy over the embeddings of the [IMG] tokens (while loading the others from the pretrained LLM).
+  with torch.no_grad():
+      # 检查模型参数 model_kwargs 是否包含键 'share_ret_gen'
+      if 'share_ret_gen' in model_kwargs:
+        assert model_kwargs['share_ret_gen'], 'Model loading only supports share_ret_gen=True for now.'
+      model.model.input_embeddings.weight[-model_kwargs['num_tokens']:, :].copy_(img_token_embeddings)
+  if load_ret_embs and len(embs_paths) > 0:
+    logit_scale = model.model.logit_scale.exp()
+    emb_matrix = torch.tensor(emb_matrix, dtype=logit_scale.dtype).to(logit_scale.device)
+    emb_matrix = emb_matrix / emb_matrix.norm(dim=1, keepdim=True)
+    emb_matrix = logit_scale * emb_matrix
+    model.emb_matrix = emb_matrix
   checkpoint = torch.load(model_ckpt_path)
   state_dict = {}
   # This is needed if we train with DDP.
