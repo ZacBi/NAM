@@ -1,16 +1,22 @@
-from enum import Enum
+import random
+import shutil
 import subprocess
 import sys
-import shutil
+from enum import Enum
+from io import BytesIO
+from typing import List, Tuple
+
+import accelerate
+import requests
 import torch
 import torch.distributed as dist
-from torchvision.transforms import functional as F
-from torchvision import transforms as T
-from transformers import AutoFeatureExtractor
+from detectron2.data.detection_utils import convert_PIL_to_numpy
+from diffusers import DiffusionPipeline
+from diffusers_interpret.generated_images import GeneratedImages
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import random
-import requests
-from io import BytesIO
+from torchvision import transforms as T
+from torchvision.transforms import functional as F
+from transformers import AutoFeatureExtractor
 
 
 def dump_git_status(out_file=sys.stdout, exclude_file_patterns=['*.ipynb', '*.th', '*.sh', '*.txt', '*.json']):
@@ -247,3 +253,98 @@ class AverageMeter(object):
       raise ValueError('invalid summary type %r' % self.summary_type)
     
     return fmtstr.format(**self.__dict__)
+
+def mask_target_cls(image: torch.Tensor, target_cls_id: int, det_model, pipe: DiffusionPipeline) -> torch.Tensor:
+      """
+          use detect model to mask the target cls
+
+          Args:
+            image: image tensor
+            target_cls_id: target class id
+            det_model: detect model, default should be Eva-02
+          Returns:
+            return_outputs: List consisting of either str or List[PIL.Image.Image] objects, representing image-text interleaved model outputs.
+      """
+      if target_cls_id == -1 or det_model is None:
+          # 返回一个identity矩阵
+          return torch.ones_like(image, dtype=torch.bool)
+
+      # clone and detach
+      image = image.clone().detach()
+      height, width, channel = image.shape
+      # transform image to PIL type to adapt the input of detect model
+      all_images = GeneratedImages(
+          all_generated_images=[image],
+          pipe=pipe,
+          remove_batch_dimension=True,
+          prepare_image_slider=False
+      )
+
+      image = torch.as_tensor(convert_PIL_to_numpy(
+          all_images[-1], format="BGR").astype("float32").transpose(2, 0, 1))
+
+      inputs = {"image": image, "height": height, "width": width}
+      predictions = det_model([inputs])[0]
+      # offload det_model to cpu for saving gpu memory
+      accelerate.cpu_offload(det_model)
+
+      instances = predictions['instances']
+      pred_masks = instances.pred_masks
+      pred_classes = instances.pred_classes
+      # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
+      mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
+      # 扩张到和image同样的维度
+      return mask.unsqueeze(0).repeat(channel, 1, 1).permute(1, 2, 0)
+
+
+def gradients_attribution(
+    pred_logits: torch.Tensor,
+    input_embeds: Tuple[torch.Tensor],
+    det_model,
+    pipe: DiffusionPipeline,
+    retain_graph: bool = False,
+    target_cls_id: int = -1,
+) -> List[torch.Tensor]:
+      # TODO: add description
+
+      assert len(pred_logits.shape) == 3
+
+      # get mask matrix for target class
+      target_mask = mask_target_cls(pred_logits, target_cls_id, det_model, pipe)
+
+      # Construct tuple of scalar tensors with all `pred_logits`
+      # The code below is equivalent to `tuple_of_pred_logits = tuple(torch.flatten(pred_logits))`,
+      #  but for some reason the gradient calculation is way faster if the tensor is flattened like this
+      tuple_of_pred_logits = []
+      for px, mx in zip(pred_logits, target_mask):
+          for py, my in zip(px, mx):
+              for pz, mz in zip(py, my):
+                  if mz:
+                      tuple_of_pred_logits.append(pz)
+      tuple_of_pred_logits = tuple(tuple_of_pred_logits)
+
+      # get the sum of back-prop gradients for all predictions with respect to the inputs
+      if torch.is_autocast_enabled():
+          # FP16 may cause NaN gradients https://github.com/pytorch/pytorch/issues/40497
+          # TODO: this is still an issue, the code below does not solve it
+          with torch.autocast(input_embeds[0].device.type, enabled=False):
+              grads = torch.autograd.grad(
+                  tuple_of_pred_logits, input_embeds, retain_graph=retain_graph)
+      else:
+          grads = torch.autograd.grad(
+              tuple_of_pred_logits, input_embeds, retain_graph=retain_graph)
+
+      if torch.isnan(grads[-1]).any():
+          raise RuntimeError(
+              "Found NaNs while calculating gradients. "
+              "This is a known issue of FP16 (https://github.com/pytorch/pytorch/issues/40497).\n"
+              "Try to rerun the code or deactivate FP16 to not face this issue again."
+          )
+
+      # Aggregate
+      aggregated_grads = []
+      # default use gradients of input_embeds
+      for grad, inp in zip(grads, input_embeds):
+        aggregated_grads.append(torch.norm(grad * inp, dim=-1))
+
+      return aggregated_grads

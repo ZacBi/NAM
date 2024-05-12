@@ -581,8 +581,9 @@ class GILL(nn.Module):
 
   def generate_for_images_and_texts(
     self, prompts: List, num_words: int = 0, min_word_tokens: int = 0, ret_scale_factor: float = 1.0, gen_scale_factor: float = 1.0,
-    top_p: float = 1.0, temperature: float = 0.0, max_num_rets: int = 1, generator=None, 
-    always_add_bos : bool = False, guidance_scale: float = 7.5, num_inference_steps: int = 50):
+    top_p: float = 1.0, temperature: float = 0.0, max_num_rets: int = 1, generator=None,
+    always_add_bos: bool = False, guidance_scale: float = 7.5, num_inference_steps: int = 50,
+    gen_max_bs: int = 8, det_model = None, target_cls_id: int = 15):
     """
     Encode prompts into embeddings, and generates text and image outputs accordingly.
 
@@ -594,8 +595,10 @@ class GILL(nn.Module):
       top_p: If set to < 1, the smallest set of tokens with highest probabilities that add up to top_p or higher are kept for generation.
       temperature: Used to modulate logit distribution.
       max_num_rets: Maximum number of images to return in one generation pass.
+      det_model: instance segmentation model, default should be Eva-02
+      target_cls_id: target class id in generated image, default is 15 (cat)
     Returns:
-      return_outputs: List consisting of either str or List[PIL.Image.Image] objects, representing image-text interleaved model outputs.
+      return_outputs: List consisting of either str or List[PIL.Image.Image] or attribution of gill output objects, representing image-text interleaved model outputs.
     """
     input_embs = []
     input_ids = []
@@ -723,12 +726,16 @@ class GILL(nn.Module):
           # OPTIM(jykoh): Only generate if scores are low.
           if self.load_sd:
             # If num_gen_images > 8, split into multiple batches (for GPU memory reasons).
-            gen_max_bs = 8
             gen_images = []
+            idx_attribution = []
             for i in range(0, self.num_gen_images, gen_max_bs):
-              gen_images.extend(
-                self.sd_pipe(prompt_embeds=gen_emb[i:i+gen_max_bs], generator=generator,
-                             guidance_scale=guidance_scale, num_inference_steps=num_inference_steps).images)
+              ith_gen_images = self.sd_pipe(prompt_embeds=gen_emb[i:i+gen_max_bs], generator=generator,
+                           guidance_scale=guidance_scale, num_inference_steps=num_inference_steps).images
+              if det_model is not None:
+                idx_attribution.extend(utils.gradients_attribution(
+                    ith_gen_images[0], gen_emb[i:i+gen_max_bs], det_model, self.sd_pipe, target_cls_id))
+              gen_images.extend(ith_gen_images)
+              # add relation between instance and the output of gill.
 
             all_gen_pixels = []
             for img in gen_images:
@@ -758,6 +765,7 @@ class GILL(nn.Module):
           last_ret_idx = ret_idx + 1
           return_outputs.append(utils.truncate_caption(caption) + f' {gen_prefix}')
           return_outputs.append(image_outputs)
+          return_outputs.append(idx_attribution)
 
     return return_outputs
 
