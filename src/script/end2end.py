@@ -225,7 +225,6 @@ class Trainer:
             for item in output.token_attributions:
                 writer.writerow(item)
             logger.info("save json file to {}".format(file_prefix + '.json'))
-        
 
     def download_model(self):
         model_ids = [self.sd_id, self.eva_id]
