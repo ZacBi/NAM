@@ -535,7 +535,7 @@ class GILLModel(nn.Module):
 class GILL(nn.Module):
   def __init__(self, tokenizer, model_args: Optional[GILLArgs] = None,
                path_array: Optional[List[str]] = None, emb_matrix: Optional[torch.tensor] = None,
-               load_sd: bool = False, num_gen_images: int = 1, decision_model_path: Optional[str] = None):
+               load_sd: bool = False, num_gen_images: int = 1, decision_model_path: Optional[str] = None, sd_model_path='runwayml/stable-diffusion-v1-5'):
     super().__init__()
     self.model = GILLModel(tokenizer, model_args)
     self.path_array = path_array
@@ -815,7 +815,7 @@ class GILL(nn.Module):
     return -outputs.loss.item()  
 
 
-def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str = 'decision_model.pth.tar') -> GILL:
+def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str = 'decision_model.pth.tar', sd_model_path='runwayml/stable-diffusion-v1-5') -> GILL:
   model_args_path = os.path.join(model_dir, 'model_args.json')
   model_ckpt_path = os.path.join(model_dir, 'pretrained_ckpt.pth.tar')
   embs_paths = [s for s in glob.glob(os.path.join(model_dir, 'cc3m*.npy'))]
@@ -879,7 +879,7 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
 
   # Initialize model for inference.
   model = GILL(tokenizer, args, path_array=path_array, emb_matrix=emb_matrix,
-               load_sd=True, num_gen_images=1, decision_model_path=decision_model_path)
+               load_sd=True, num_gen_images=1, decision_model_path=decision_model_path, sd_model_path=sd_model_path)
   model = model.eval()
   model = model.bfloat16()
   model = model.cuda()
