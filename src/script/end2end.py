@@ -185,7 +185,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
 
 
 class Trainer:
-    def __init__(self, workspace: str = '/mnt/workspace', eva_id: str = 'zacbi2023/eva02', sd_id: str = 'AI-ModelScope/stable-diffusion-2-1',):
+    def __init__(self, workspace: str = '/mnt/workspace', eva_id: str = 'zacbi2023/eva02', sd_id: str = 'AI-ModelScope/stable-diffusion-v1-5',):
         self.base_path = workspace
         self.model_path = path.join(workspace, 'model')
         self.data_path = path.join(workspace, "data")
@@ -224,11 +224,11 @@ class Trainer:
                 writer.writerow(item)
             logger.info("save json file to {}".format(file_prefix + '.json'))
 
-    def download_model(self):
+    def download_model(self, ignore_patterns=[".safetensors", ".msgpack", ".h5"]):
         model_ids = [self.sd_id, self.eva_id]
         for model_id in model_ids:
             if not path.exists(path.join(self.model_path, model_id)):
-                snapshot_download(model_id, cache_dir=self.model_path)
+                snapshot_download(model_id, cache_dir=self.model_path, ignore_file_pattern=ignore_patterns)
 
     def prepare_stable_diffusion(self):
         self.sd_pipeline = AutoPipelineForText2Image.from_pretrained(
@@ -257,7 +257,7 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def infer(self, prompt: Optional[str] = None, prompt_embedding: Optional[torch.FloatTensor] = None, target_cls_id: int = 15, num_inference_steps=50, n_last_diffusion_steps_to_consider_for_attributions=5):
+    def infer(self, prompt: Optional[str] = None, prompt_embeds: Optional[torch.FloatTensor] = None, target_cls_id: int = 15, num_inference_steps=50, n_last_diffusion_steps_to_consider_for_attributions=5):
         """
             target_cls_id = 15 为 cat
             n_last_diffusion_steps_to_consider_for_attributions 这个参数需要check，判断上下界
@@ -265,14 +265,15 @@ class Trainer:
             # 2. eva图像分割获取目标区域mask
             # 3. sd-interpret根据mask进行归因
         """
-        if not prompt and not prompt_embedding:
+        if  prompt is None and prompt_embeds is None:
             raise ValueError("prompt and prompt_embeddin can't all be None")
 
         explainer = StableDiffusionPipelineDetExplainer(
             self.sd_pipeline, det_model=self.eva)
         with torch.autocast('cuda'):
             output = explainer(
-                prompt,
+                prompt=prompt,
+                prompt_embeds=prompt_embeds,
                 num_inference_steps=num_inference_steps,
                 n_last_diffusion_steps_to_consider_for_attributions=n_last_diffusion_steps_to_consider_for_attributions,
                 target_cls_id=target_cls_id
@@ -282,8 +283,11 @@ class Trainer:
 
 def main():
     prompt = "An orange striped tabby cat laying on top of a red vehicle's wheel."
+    prompt_embeds = torch.load('/mnt/workspace/data/tensor/gen_emb/mapper_out_tensor_cat.pt', mmap=True)
+    prompt_embeds.requires_grad_(True)
     trainer = Trainer()
-    output = trainer.infer(prompt, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 1)
+    output = trainer.infer(prompt_embeds=prompt_embeds, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 1)
+    # output = trainer.infer(prompt=prompt, target_cls_id=15, n_last_diffusion_steps_to_consider_for_attributions = 1)
     trainer.postprocess(output)
 
 

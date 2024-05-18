@@ -162,3 +162,4 @@ cython_debug/
 data/
 .vscode/launch.json
 .trunk/
+src/gill/checkpoints/cc3m_embeddings_urls.npy

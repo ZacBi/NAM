@@ -77,7 +77,7 @@ class GILLModel(nn.Module):
 
     print("Restoring pretrained weights for the visual model.")
     if 'clip' in visual_encoder:
-      self.visual_model = CLIPVisionModel.from_pretrained(visual_encoder, local_files_only=True)
+      self.visual_model = CLIPVisionModel.from_pretrained(visual_encoder, fast=False, local_files_only=True)
     else:
       self.visual_model = AutoModel.from_pretrained(visual_encoder, local_files_only=True)
 
