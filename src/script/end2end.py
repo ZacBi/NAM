@@ -1,27 +1,25 @@
-import logging
-from os import path
-import os
-from typing import List, Optional, Tuple, Union
-
-from datetime import datetime
-import json
 import csv
+import logging
+import os
+from datetime import datetime
+from os import path
+from typing import List, Optional, Tuple, Union
 
 import accelerate
 import torch
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import LazyConfig, instantiate
+from detectron2.data.detection_utils import convert_PIL_to_numpy
 from diffusers import AutoPipelineForText2Image, DiffusionPipeline
 from diffusers_interpret import StableDiffusionPipelineExplainer
 from diffusers_interpret.data import (
-    AttributionAlgorithm, AttributionMethods, BaseMimicPipelineCallOutput,
+    AttributionAlgorithm, AttributionMethods,
     PipelineExplainerForBoundingBoxOutput, PipelineExplainerOutput,
     PipelineImg2ImgExplainerForBoundingBoxOutputOutput,
     PipelineImg2ImgExplainerOutput)
 from diffusers_interpret.generated_images import GeneratedImages
 from modelscope.hub.snapshot_download import snapshot_download
 from PIL.Image import Image
-from detectron2.data.detection_utils import read_image, convert_PIL_to_numpy
 
 # logger
 logger = logging.getLogger(__name__)
@@ -259,7 +257,7 @@ class Trainer:
         DetectionCheckpointer(self.eva).load(eva_weights_path)
         self.eva.eval()
 
-    def infer(self, prompt: str, target_cls_id: int, num_inference_steps = 50, n_last_diffusion_steps_to_consider_for_attributions = 5):
+    def infer(self, prompt: Optional[str] = None, prompt_embedding: Optional[torch.FloatTensor] = None, target_cls_id: int = 15, num_inference_steps=50, n_last_diffusion_steps_to_consider_for_attributions=5):
         """
             target_cls_id = 15 为 cat
             n_last_diffusion_steps_to_consider_for_attributions 这个参数需要check，判断上下界
@@ -267,6 +265,9 @@ class Trainer:
             # 2. eva图像分割获取目标区域mask
             # 3. sd-interpret根据mask进行归因
         """
+        if not prompt and not prompt_embedding:
+            raise ValueError("prompt and prompt_embeddin can't all be None")
+
         explainer = StableDiffusionPipelineDetExplainer(
             self.sd_pipeline, det_model=self.eva)
         with torch.autocast('cuda'):

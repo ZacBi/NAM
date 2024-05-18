@@ -54,7 +54,8 @@ class GILLModel(nn.Module):
     print(f"Using {visual_encoder} for the visual model with {n_visual_tokens} visual tokens.")
 
     if 'facebook/opt' in opt_version:
-      self.lm = OPTForCausalLM.from_pretrained(opt_version)
+      # self.lm = OPTForCausalLM.from_pretrained(opt_version, local_files_only=True)
+      self.lm = OPTForCausalLM.from_pretrained('/root/.cache/huggingface/hub/models--facebook--opt-6.7b/snapshots/a45aa65bbeb77c1558bc99bedc6779195462dab0', local_files_only=True)
     else:
       raise NotImplementedError
 
@@ -76,9 +77,9 @@ class GILLModel(nn.Module):
 
     print("Restoring pretrained weights for the visual model.")
     if 'clip' in visual_encoder:
-      self.visual_model = CLIPVisionModel.from_pretrained(visual_encoder)
+      self.visual_model = CLIPVisionModel.from_pretrained(visual_encoder, local_files_only=True)
     else:
-      self.visual_model = AutoModel.from_pretrained(visual_encoder)
+      self.visual_model = AutoModel.from_pretrained(visual_encoder, local_files_only=True)
 
     if 'clip' in visual_encoder:
       hidden_size = self.visual_model.config.hidden_size
@@ -253,7 +254,7 @@ class GILLModel(nn.Module):
           assert torch.all(first_labels_padding == -100), first_labels_padding
           assert torch.all(second_labels_padding == -100), second_labels_padding
           assert torch.all(second_labels[bos_idx] == self.tokenizer.bos_token_id), (second_labels, bos_idx, self.tokenizer.bos_token_id)
-          
+
           # Remove BOS token of the second caption.
           second_labels = torch.cat([second_labels[:bos_idx], second_labels[bos_idx + 1:]], axis=0)
           second_emb = torch.cat([second_emb[:bos_idx, :], second_emb[bos_idx + 1:, :]], axis=0)
@@ -326,7 +327,7 @@ class GILLModel(nn.Module):
           assert torch.all(first_labels_padding == -100), first_labels_padding
           assert torch.all(second_labels_padding == -100), second_labels_padding
           assert torch.all(second_labels[bos_idx] == self.tokenizer.bos_token_id), (second_labels, bos_idx, self.tokenizer.bos_token_id)
-          
+
           # Remove BOS token of second caption.
           second_labels = second_labels[bos_idx + 1:]
           second_emb = second_emb[bos_idx + 1:, :]
@@ -547,8 +548,7 @@ class GILL(nn.Module):
 
     # Load the Stable Diffusion model.
     if load_sd:
-      model_id = "runwayml/stable-diffusion-v1-5"
-      self.sd_pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16).to("cuda")
+      self.sd_pipe = StableDiffusionPipeline.from_pretrained(sd_model_path, torch_dtype=torch.float16).to("cuda")
 
     if decision_model_path is not None:
       print('Loading decision model...')
@@ -850,7 +850,7 @@ def load_gill(model_dir: str, load_ret_embs: bool = True, decision_model_fn: str
     model_kwargs = json.load(f)
 
   # Initialize tokenizer.
-  tokenizer = AutoTokenizer.from_pretrained(model_kwargs['opt_version'], use_fast=False)
+  tokenizer = AutoTokenizer.from_pretrained(model_kwargs['opt_version'], use_fast=False, local_files_only=True)
   if tokenizer.pad_token is None:
       tokenizer.pad_token_id = tokenizer.eos_token_id
   # Add an image token for loss masking (and visualization) purposes.
