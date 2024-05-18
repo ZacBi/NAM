@@ -253,7 +253,7 @@ class GILLModel(nn.Module):
           assert torch.all(first_labels_padding == -100), first_labels_padding
           assert torch.all(second_labels_padding == -100), second_labels_padding
           assert torch.all(second_labels[bos_idx] == self.tokenizer.bos_token_id), (second_labels, bos_idx, self.tokenizer.bos_token_id)
-          
+
           # Remove BOS token of the second caption.
           second_labels = torch.cat([second_labels[:bos_idx], second_labels[bos_idx + 1:]], axis=0)
           second_emb = torch.cat([second_emb[:bos_idx, :], second_emb[bos_idx + 1:, :]], axis=0)
@@ -326,7 +326,7 @@ class GILLModel(nn.Module):
           assert torch.all(first_labels_padding == -100), first_labels_padding
           assert torch.all(second_labels_padding == -100), second_labels_padding
           assert torch.all(second_labels[bos_idx] == self.tokenizer.bos_token_id), (second_labels, bos_idx, self.tokenizer.bos_token_id)
-          
+
           # Remove BOS token of second caption.
           second_labels = second_labels[bos_idx + 1:]
           second_emb = second_emb[bos_idx + 1:, :]
