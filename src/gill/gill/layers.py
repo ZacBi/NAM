@@ -56,6 +56,3 @@ class GenTextHiddenFcs(nn.Module):
   def __init__(self, in_dim=4096, out_dim=768, num_output_tokens=77, mode='gill_mapper'):
     super().__init__()
     self.gen_text_hidden_fcs = nn.ModuleList([])
-
-    self.gen_text_hidden_fcs.append(TextFcLayer(in_dim=in_dim, out_dim=out_dim,
-                                                num_output_tokens=num_output_tokens, mode=mode))
