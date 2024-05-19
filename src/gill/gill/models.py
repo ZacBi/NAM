@@ -741,7 +741,7 @@ class GILL(nn.Module):
                     prompt_embeds=gen_emb[i:i+gen_max_bs],
                     num_inference_steps=num_inference_steps,
                     target_cls_id=target_cls_id,
-                    raw_emb=raw_emb
+                    raw_embeds=raw_emb
                 ))
               gen_images.extend(ith_gen_images)
               # add relation between instance and the output of gill.
