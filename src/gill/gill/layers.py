@@ -52,3 +52,11 @@ class TextFcLayer(nn.Module):
     assert outputs.shape[1] == 1 or (outputs.shape[1] * outputs.shape[2] == self.num_output_tokens * 768), (outputs.shape, self.num_output_tokens)
     return outputs  # (N, T, D)
 
+
+class GenTextHiddenFcs(nn.Module):
+  def __init__(self, in_dim=4096, out_dim=768, num_output_tokens=77, mode='gill_mapper'):
+    super().__init__()
+    self.gen_text_hidden_fcs = nn.ModuleList([])
+
+    self.gen_text_hidden_fcs.append(TextFcLayer(in_dim=in_dim, out_dim=out_dim,
+                                                num_output_tokens=num_output_tokens, mode=mode))
