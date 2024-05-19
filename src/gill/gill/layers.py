@@ -27,7 +27,7 @@ class TextFcLayer(nn.Module):
 
   def forward(self, x: torch.Tensor, input_embs: torch.Tensor) -> torch.Tensor:
     outputs = None
-    
+
     if self.mode == 'gill_mapper':
       x = x + input_embs
 
@@ -48,7 +48,7 @@ class TextFcLayer(nn.Module):
           outputs = outputs[:, :self.num_output_tokens, :]
         else:
           raise NotImplementedError
-    
+
     assert outputs.shape[1] == 1 or (outputs.shape[1] * outputs.shape[2] == self.num_output_tokens * 768), (outputs.shape, self.num_output_tokens)
     return outputs  # (N, T, D)
 

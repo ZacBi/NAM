@@ -17,6 +17,8 @@ from transformers import AutoTokenizer, AutoModel, CLIPVisionModel, OPTForCausal
 from gill import utils
 from gill import layers
 
+from diffusers_interpret import StableDiffusionPipelineDetExplainer
+
 
 class GILLArgs:
   freeze_lm: bool = True
@@ -728,12 +730,19 @@ class GILL(nn.Module):
             # If num_gen_images > 8, split into multiple batches (for GPU memory reasons).
             gen_images = []
             idx_attribution = []
+            explainer = None
+            if det_model is not None:
+               explainer = StableDiffusionPipelineDetExplainer(pipe=self.sd_pipe, det_model=det_model)
             for i in range(0, self.num_gen_images, gen_max_bs):
               ith_gen_images = self.sd_pipe(prompt_embeds=gen_emb[i:i+gen_max_bs], generator=generator,
                            guidance_scale=guidance_scale, num_inference_steps=num_inference_steps).images
-              if det_model is not None:
-                idx_attribution.extend(utils.gradients_attribution(
-                    ith_gen_images[0], gen_emb[i:i+gen_max_bs], det_model, self.sd_pipe, target_cls_id))
+              if explainer is not None:
+                idx_attribution.extend(explainer(
+                    prompt_embeds=gen_emb[i:i+gen_max_bs],
+                    num_inference_steps=num_inference_steps,
+                    target_cls_id=target_cls_id,
+                    raw_emb=raw_emb
+                ))
               gen_images.extend(ith_gen_images)
               # add relation between instance and the output of gill.
 
