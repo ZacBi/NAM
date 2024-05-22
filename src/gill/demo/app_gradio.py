@@ -13,10 +13,6 @@ import numpy as np
 import os
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "False"
 css = """
-    # 设置 id 为 chatbot 的元素的最小高度为 300px，确保聊天机器人界面的高度不会小于 300px。
-    #chatbot { min-height: 300px; }
-    # #save-btn、#share-btn 分别设置了 id 为 save-btn 和 share-btn 的按钮元素的背景渐变颜色。
-    # 当鼠标悬停在按钮上时，背景颜色会发生变化，采用不同的渐变颜色。
     #save-btn {
         background-image: linear-gradient(to right bottom, rgba(130,217,244, 0.9), rgba(158,231,214, 1.0));
     }
@@ -29,11 +25,9 @@ css = """
     #share-btn:hover {
         background-image: linear-gradient(to right bottom, rgba(110,197,224, 0.9), rgba(138,211,194, 1.0));
     }
-    # 当鼠标悬停在按钮图片上时，取消图片的放大效果并恢复正常大小。
     #gallery { z-index: 999999; }
     #gallery img:hover {transform: scale(2.3); z-index: 999999; position: relative; padding-right: 30%; padding-bottom: 30%;}
     #gallery button img:hover {transform: none; z-index: 999999; position: relative; padding-right: 0; padding-bottom: 0;}
-    # 在不支持鼠标悬停的设备上，取消图片的放大效果（transform: none），恢复到原始大小。
     @media (hover: none) {
         #gallery img:hover {transform: none; z-index: 999999; position: relative; padding-right: 0; 0;}
     }
