@@ -26,7 +26,7 @@ def get_agg_accs(name):
     print(accs.shape)
     return accs
 
-# TODO: 和numpy.finfo有啥联系
+
 def finfo(acc, p, type="mean"):
     """_summary_
 
@@ -37,25 +37,25 @@ def finfo(acc, p, type="mean"):
     Returns:
         _type_: _description_
     """
-    # NOTE: 这里都是bert参数. 12, 层数. 3072, ffn的维度, 768, embedding的维度, 这里写死稍微有点hack
+    
     if (p == 0):
         return torch.zeros((12, 3072)).bool()
     acc = abs(acc - 0.5)
     print(acc.shape)
     if (type == "mean"):
-        # NOTE: 先压缩掉prompt_size这个维度，然后压缩num_acc这个维度, 如果只有一个acctable的话就无所谓
-        # NOTE: h最终shape是(layer_num, layer_width) 
-        # NOTE: 可以理解为第i个神经元对所有神经元的最大激活程度？ 这里直接压缩其实有点损失
-        # NOTE: 原文：For each group of soft prompts P, the predictivity of N on it is defined as the predictivity of the best soft prompt token.
+        
+        
+        
+        
         h = acc.max(axis=2).values.mean(axis=0)
     else:
-        # TODO: min这个操作没看懂, 为了干啥，这个要看下论文
+        
         h = acc.max(axis=2).values.min(axis=0).values
     print(h.shape)
     inf = []
-    # NOTE: 遍历12层, 
+    
     for l in range(12):
-        # NOTE: 激活值倒
+        
         idx = sorted(range(3072), key=lambda i: -h[l][i])
         inf.append(torch.zeros((3072)))
         for j in range(int(p*3072)):
@@ -72,7 +72,7 @@ def main():
                         help="path to save skillneuron")
     parser.add_argument("--type", type=str, default="mean",
                         help="aggregation method, choose from mean or min")
-    # NOTE: acc: 模型在各个prompt上的acc，用于计算skill neuron
+    
     parser.add_argument("-a", "--acc_path", default="", type=str,
                         help="path of probed acc to generate skill neuron, seperated by comma")
     parser.add_argument("-aa", "--acc_aux_path", default="", type=str,
@@ -84,7 +84,7 @@ def main():
     args.task_type = args.task_type.lower()
     num_labels = datasetLabel[args.task_type]
     multi_class = num_labels > 2
-    # TODO: 这是啥trick?
+    
     if (multi_class):
         step_size = 0.005
     else:
@@ -94,12 +94,12 @@ def main():
     create_dir(args.save_to)
 
     agginfo = dict()
-    # TODO: 这魔数啥玩意，paper没看见, 代码看下来是生成概率列表
+    
     length = 21
     
-    # NOTE: 看简单下游二元分类任务 
+    
     if (not multi_class):
-        # NOTE: 累积accs精度表
+        
         accs = get_agg_accs(args.acc_path)
         # 0, 0.01, 0.02, ..., 0.2
         plist = [step_size * _ for _ in range(length)]

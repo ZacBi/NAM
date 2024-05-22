@@ -42,7 +42,7 @@ sd_pipe = AutoPipelineForText2Image.from_pretrained(
     path.join(model_path, sd_id), torch_dtype=torch_dtype).to(device)
 explainer = StableDiffusionPipelineDetExplainer(pipe=sd_pipe, det_model=eva)
 
-# llm生成的(batch_size, seq_len, hidden_dim)
+# shape of llm output is  (batch_size, seq_len, hidden_dim)
 raw_emb = torch.load('/mnt/workspace/data/tensor/raw_emb_tensor_cat_1.pt').to(torch_dtype)
 raw_emb.requires_grad_(True)
 # embedding img0-imge8

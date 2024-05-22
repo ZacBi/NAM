@@ -48,7 +48,7 @@ def build_mlp_projector(config, **kwargs):
         _type_: _description_
     """
 
-    # TODO: 异常处理
+    
     act_fn = ACT2FN[config.hidden_act] if isinstance(
         config.hidden_act, str) else config.hidden_act
 
@@ -121,7 +121,7 @@ def build_gengenerator(config, **kwargs):
     Returns:
         _type_: _description_
     """
-    # 图像类默认用stable diffusion, 从pipleline取
+    
     if config.generator_type == "image":
         return SDImageGenerator(config)
 
@@ -160,7 +160,7 @@ class SDImageGenerator(ImageGenerator):
             config.generator_model_pth, torch_dtype=torch.float16, variant="fp16")
 
     def forward(self, hidden_states):
-        # 默认冻结状态
+        
         outputs = self.pipeline(prompt_embeds=hidden_states)  # type: ignore
         return outputs
 
@@ -183,7 +183,7 @@ class MMUnderstander(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.input_type = config.input_type
-        # 模态编码器, 如果是非文本的话
+        
         if self.input_type != Modality.TEXT.value:
             self.m_encoder = MEncoder(config)
             self.input_projector = InputProjector(config)
@@ -210,7 +210,7 @@ class MMUnderstander(nn.Module):
             type (str): 输入的类型, 例如文本, 图像, 音频等, 见枚举类
             input (Any): 输入的数据, 如果是文本, 应为input_ids, 如果是图像, 应为图像的tensor, 如果是音频, 应为音频的tensor
         """
-        # 搞个策略模式
+        
         if (type == Modality.TEXT.value):
             return self.word_embbeding(input)
         # elif
@@ -257,7 +257,7 @@ class MMModel(nn.Module):
 
     def intermediate(self, n) -> nn.Module:
         if self.config.backbone_type == 'llama':
-            # llama的层数由num_hidden_layers决定, 所有的backbone的层数都需要前置到config里面
+            
             return self.mm_understander.backbone.layers[n].mlp
         return nn.Module()
 
@@ -283,7 +283,7 @@ class MMModelPrune(MMModel):
 
     def intermediate(self, n) -> nn.Module:
         if self.config.backbone_type == 'llama':
-            # llama的层数由num_hidden_layers决定, 所有的backbone的层数都需要前置到config里面
+            
             return self.mm_understander.backbone.layers[n].mlp
         return nn.Module()
 
@@ -299,7 +299,7 @@ class FastVerifyText2ImageMMModel(nn.Module):
     """取默认配置即可"""
     def __init__(self, config) -> None:
         super().__init__(config)
-        # sd 原生自带CLIPTextModel, 不需要再引入bert, 可以替换为One-peace
+        
         self.pipeline = AutoPipelineForText2Image.from_pretrained(
             config.generator_model_pth, torch_dtype=torch.float16, variant="fp16").to('cuda')
 

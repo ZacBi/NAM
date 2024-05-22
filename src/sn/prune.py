@@ -39,18 +39,18 @@ def main():
     state_dict = roberta.state_dict()
     prompt = torch.load(args.resume_from,map_location="cpu")
 
-    # NOTE: 技能神经元的mask
+    
     mask = torch.load(args.info_path)
-    # NOTE: 激活阈值, shape为(layer_num, prompt_size, layer_width)
+    
     ths = torch.tensor(torch.load(args.ths_path))
     if(len(ths.shape) == 3):
         print("Aggregating Threshold")
         print(ths.shape)
-        # NOTE: 压缩为对整个prompt的激活阈值
+        
         ths = ths.mean(axis = 1)
-    # 后9层
+    
     for k in range(3,12):
-        # shape为(layer_width,)
+        
         pbias = ths[k]
         pmask = mask[k]
         inputweight =  state_dict['roberta.encoder.layer.'+str(k)+'.intermediate.dense.weight']
@@ -58,11 +58,11 @@ def main():
         outputweight = state_dict['roberta.encoder.layer.'+str(k)+'.output.dense.weight']
         outputbias = state_dict['roberta.encoder.layer.'+str(k)+'.output.dense.bias']
         idx = []
-        # TODO: 这个代码可以优化一下，直接调底层api
+        
         for i in range(3072):
             if(pmask[i]):
                 idx.append(i)
-        # NOTE: 顺序补足神经元，得看看论文拿下面几步干啥
+        
         for i in range(3072):
             if(len(idx) < int(3072*0.02)):
                 if(~pmask[i]):

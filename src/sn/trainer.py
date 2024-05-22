@@ -240,7 +240,7 @@ class trainer:
             def fn(_, __, output):
                 hidden[n].append(output)
             return fn
-        # NOTE: 参考https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.register_forward_hook
+        
         # NOTE: [batch_size, promt_size, ]
         handle = [self.model.intermediate(n).register_forward_hook(
             forward_hook(n)) for n in range(12)]
@@ -310,7 +310,7 @@ class trainer:
                     hidden[k][0] = hidden[k][0][:,
                                                 :self.model.prompt_size, :].detach().cpu().numpy()
                     pred = (hidden[k][0] > ths[k])
-                    # NOTE: 预测精度表, sum(axis=0)将batch_size维度压缩掉了
+                    
                     acctable[k] = acctable[k] + (pred == label).sum(axis=0)
         elif (self.model.prompt_type == "GPT"):
             def process(hidden, label, length):

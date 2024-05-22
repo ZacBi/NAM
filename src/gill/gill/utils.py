@@ -266,7 +266,7 @@ def mask_target_cls(image: torch.Tensor, target_cls_id: int, det_model, pipe: Di
             return_outputs: List consisting of either str or List[PIL.Image.Image] objects, representing image-text interleaved model outputs.
       """
       if target_cls_id == -1 or det_model is None:
-          # 返回一个identity矩阵
+          
           return torch.ones_like(image, dtype=torch.bool)
 
       # clone and detach
@@ -291,9 +291,9 @@ def mask_target_cls(image: torch.Tensor, target_cls_id: int, det_model, pipe: Di
       instances = predictions['instances']
       pred_masks = instances.pred_masks
       pred_classes = instances.pred_classes
-      # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
+      
       mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
-      # 扩张到和image同样的维度
+      
       return mask.unsqueeze(0).repeat(channel, 1, 1).permute(1, 2, 0)
 
 

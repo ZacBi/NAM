@@ -47,12 +47,12 @@ from gill import models
 from gill import utils
 from gill import validate
 
-# 模型的名称
-# 数据集
+
+
 llm_models = ['facebook/opt-125m', 'facebook/opt-350m', 'facebook/opt-1.3b', 'facebook/opt-2.7b',
               'facebook/opt-6.7b', 'facebook/opt-13b', 'facebook/opt-30b', 'facebook/opt-66b']
 datasets = ['cc3m']
-# 目前为止最佳模型准确率的变量
+
 best_acc1 = 0  # Variable to keep track of best model so far.
 
 
@@ -173,17 +173,17 @@ def parse_args(args):
 
 
 def main(args):
-  # 提取命令行参数，首先是这个log_dir到底存在吗？？？
+  
   args = parse_args(args)
   i = 1
-  # 日志地址
+  
   args.log_dir = os.path.join(args.log_base_dir, args.exp_name)
-  # 如果日志地址存在
+  
   while os.path.exists(args.log_dir):
-    # 从i=1开始顺序的文件名地址
+    
     args.log_dir = os.path.join(args.log_base_dir, f'{args.exp_name}_{i}')
     i += 1
-      # 递归的创建目录
+      
   os.makedirs(args.log_dir)
 
   with open(os.path.join(args.log_dir, f'args.json'), 'w') as wf:
@@ -193,11 +193,11 @@ def main(args):
     utils.dump_git_status(out_file=wf)
 
   print(f'Logging to {args.log_dir}.')
-  # 随机种子存在， 为了保证可重复性
+  
   if args.seed is not None:
-    # 设置python的内置随机种子值为args.seed, 方便复现结果
+    
     random.seed(args.seed)
-    # PyTorch 随机数生成器的种子值为 args.seed
+    
     torch.manual_seed(args.seed)
     cudnn.deterministic = True
     warnings.warn('You have chosen to seed training. '
@@ -205,44 +205,44 @@ def main(args):
             'which can slow down your training considerably! '
             'You may see unexpected behavior when restarting '
             'from checkpoints.')
-  # 用户选择了特定的 GPU 时提醒用户数据并行性会被完全禁用
+  
   if args.gpu is not None:
     warnings.warn('You have chosen a specific GPU. This will completely '
             'disable data parallelism.')
-  # 根据条件设置 args.distributed 的值，以确定是否启用分布式训练
+  
   if args.dist_url == "env://" and args.world_size == -1:
     args.world_size = int(os.environ["WORLD_SIZE"])
 
   args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
   ngpus_per_node = torch.cuda.device_count()
-  # 判断是否启用了分布式多进程训练
+  
   if args.multiprocessing_distributed:
     # Since we have ngpus_per_node processes per node, the total world_size
     # needs to be adjusted accordingly
-    # 根据每个节点上的 GPU 数量 ngpus_per_node 和总的进程数量 args.world_size 计算出新的总进程数量
+    
     args.world_size = ngpus_per_node * args.world_size
     # Use torch.multiprocessing.spawn to launch distributed processes: the
     # main_worker process function
-    # 使用 torch.multiprocessing.spawn 函数来启动分布式进程。这个函数可以用来启动多个进程来执行同一个函数，每个进程可以在不同的 GPU 上执行
-    # main_worker 是指定的主要工作函数，nprocs 指定要启动的进程数，即每个节点上的 GPU 数量 ngpus_per_node
-    # args=(ngpus_per_node, args) 传递给 main_worker 函数的参数，其中 ngpus_per_node 表示每个节点的 GPU 数量，args 是其他参数
+    
+    
+    
     mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args))
   else:
     # Simply call main_worker function
-    # 如果未启用分布式多进程训练，则直接调用 main_worker 函数
+    
     main_worker(args.gpu, ngpus_per_node, args)
 
 
 def main_worker(gpu, ngpus_per_node, args):
-  # 全局变量best_acc1，这是在任何位置都可以使用的变量
+  
   global best_acc1
   args.gpu = gpu
-  # gpu编号
+  
   if args.gpu is not None:
     print("Use GPU: {} for training".format(args.gpu))
-  # 分布式
-  # 这段代码是根据条件设置当前进程的排名，并根据是否使用多进程分布式训练来计算全局排名，最后通过 dist.init_process_group 函数初始化分布式训练的进程组
+  
+  
   if args.distributed:
     if args.dist_url == "env://" and args.rank == -1:
       args.rank = int(os.environ["RANK"])
@@ -253,84 +253,84 @@ def main_worker(gpu, ngpus_per_node, args):
     dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                 world_size=args.world_size, rank=args.rank)
 
-  # Create model，这里需要详细理解一下
-  # 创建模型，写的好详细
-  # 应该是获得model的参数：作用是将image tokens投射到图像生成器的输入空间；并通过Loss缩小与SD text encoder(text->image)的生成器
+  
+  
+  
   model_args = models.GILLArgs()
-  # 指定优化器的版本或类型
+  
   model_args.opt_version = args.opt_version
-  # 视觉编码器
+  
   model_args.visual_encoder = args.visual_model
-  # 文本嵌入层
+  
   model_args.text_emb_layers = [-1]
-  # LM参数冻结
+  
   model_args.freeze_lm = True
-  # 生成模型参数冻结
+  
   model_args.freeze_vm = True
-  # 用于视觉编码的 token 数量
+  
   model_args.n_visual_tokens = args.n_visual_tokens
-  # 确定检索的嵌入维度
+  
   model_args.ret_emb_dim = args.ret_emb_dim
-  # 确定生成的嵌入维度
+  
   model_args.gen_emb_dim = args.gen_emb_dim
-  # 确定文本全连接模式，可能是指定文本特征提取时的全连接层的结构或模式。
+  
   model_args.text_fc_mode = args.text_fc_mode
-  # 确定检索的文本全连接模式，可能是指定返回文本特征时的全连接层的结构或模式。
+  
   model_args.ret_text_fc_mode = args.ret_text_fc_mode
-  # 确定 tokens 的数量，可能是输入数据的tokens数量
+  
   model_args.num_tokens = args.num_tokens
-  # 确定 Clip tokens 的数量，可能是指定与 Clip 相关的 token 数量
+  
   model_args.num_clip_tokens = args.num_clip_tokens
   assert args.num_tokens == 0 or 'gill_mapper' in model_args.text_fc_mode or (args.num_tokens * args.gen_emb_dim == args.num_clip_tokens * 768 or args.num_tokens * args.gen_emb_dim == args.num_clip_tokens * 1024), (f'{args.num_tokens} * {args.gen_emb_dim} != {args.num_clip_tokens} * 768 (or 1024)')
-  # 文本的分词器
+  
   tokenizer = AutoTokenizer.from_pretrained(args.opt_version, use_fast=False)
-  # 填充标记为None
+  
   if tokenizer.pad_token is None:
-    # opt是EleutherAI/gpt-j-6B
+    
     if args.opt_version in ['EleutherAI/gpt-j-6B']:
-      # 填充标记设置为分词器的结束标记
+      
       tokenizer.pad_token = tokenizer.eos_token
     else:
-      # 将填充标记的 ID 设置为分词器的结束标记的 ID。
+      
       tokenizer.pad_token_id = tokenizer.eos_token_id
     print("tokenizer.pad_token, tokenizer.eos_token:", tokenizer.pad_token, tokenizer.eos_token)
   # Add an image token for loss masking (and visualization) purposes.
-  # 为了在损失计算和可视化中使用，向分词器中添加一个特殊的图像标记
-  # 通过 tokenizer.add_special_tokens() 方法添加一个名为 "<|image|>" 的特殊标记，用于表示图像在序列中的位置
-  # 输入的图像经过处理会得到cls_token，理论上所有的图像得到的都是cls_token,这样做只能识别出输入中图像的位置呀！！！！！
+  
+  
+  
   tokenizer.add_special_tokens({"cls_token": "<|image|>"})  # add special image token to tokenizer
 
-  # 代码片段的目的是向 Tokenizer 的词汇表中添加包含 [IMG{i}] 格式的特殊标记，其中 {i} 是一个递增的数字。这些特殊标记将用于表示图像数据，以便在模型中能够正确区分和处理图像数据
+  
   # Add [IMG] tokens to the vocabulary.
   model_args.retrieval_token_idx = []
   args.retrieval_token_idx = []
-  # 承接上文，这里的num_tokens可能是设置的image_tokens的数量
+  
   for i in range(model_args.num_tokens):
     print(f'Adding [IMG{i}] token to vocabulary.')
-    # 在添加新的特殊标记 [IMG{i}] 到 Tokenizer 的词汇表之前，打印出 Tokenizer 处理该特殊标记的结果
+    
     print(f'Before adding new token, tokenizer("[IMG{i}]") =', tokenizer(f'[IMG{i}]', add_special_tokens=False))
-    # 返回添加标记的数量
+    
     num_added_tokens = tokenizer.add_tokens(f'[IMG{i}]')
     print(f'After adding {num_added_tokens} new tokens, tokenizer("[IMG{i}]") =', tokenizer(f'[IMG{i}]', add_special_tokens=False))
-    # 这部分代码调用 Tokenizer 来处理特殊标记 [IMG{i}]，并设置参数 add_special_tokens=False 来确保不添加任何额外的特殊标记
-    # 获取特殊标记img[i]的对应的token_ids
+    
+    
     ret_token_idx = tokenizer(f'[IMG{i}]', add_special_tokens=False).input_ids
-    # 断言长度为1，如果不是，打印出值
+    
     assert len(ret_token_idx) == 1, ret_token_idx
-    # # 将得到的token_id放入args.retrieval_token_idx和 model_args.retrieval_token_idx的列表中
+    # 
     model_args.retrieval_token_idx.append(ret_token_idx[0])
     args.retrieval_token_idx.append(ret_token_idx[0])
-  # 按照这里的理解，这里是设置了两个字典，一个是检索，一个是生成
+  
   # Add [IMG] tokens to the vocabulary.
   model_args.gen_token_idx = model_args.retrieval_token_idx
   args.gen_token_idx = args.retrieval_token_idx
 
   # Save model args to disk.
-  # 创建model.json文件并把model_args保存到文件中
+  
   with open(os.path.join(args.log_dir, 'model_args.json'), 'w') as f:
     json.dump(vars(model_args), f, indent=4)
 
-  # 创建模型
+  
   model = models.GILL(tokenizer, model_args)
   if args.precision == 'fp16':
     model = model.float()
@@ -343,7 +343,7 @@ def main_worker(gpu, ngpus_per_node, args):
     f.write(param_counts_text)
 
   # Log trainable parameters to Tensorboard.
-  # 关注的是可训练参数的数量和不可训练参数的数量
+  
   _, total_trainable_params, total_nontrainable_params = utils.get_params_count(model)
   writer = SummaryWriter(args.log_dir)
   writer.add_scalar('params/total', total_trainable_params + total_nontrainable_params, 0)
@@ -351,7 +351,7 @@ def main_worker(gpu, ngpus_per_node, args):
   writer.add_scalar('params/total_non_trainable', total_nontrainable_params, 0)
   writer.close()
 
-  # 这段代码主要是针对多进程分布式环境下的模型并行训练进行了设备管理和分配工作。
+  
   if not torch.cuda.is_available():
     print('WARNING: using CPU, this will be slow!')
     model = torch.nn.DataParallel(model)
@@ -392,10 +392,10 @@ def main_worker(gpu, ngpus_per_node, args):
   """Sets the learning rate to the initial LR decayed by 10 every 5 epochs"""
   scheduler_steplr = StepLR(optimizer, step_size=args.lr_schedule_step_size * args.steps_per_epoch, gamma=args.lr_schedule_gamma)
   scheduler = GradualWarmupScheduler(optimizer, multiplier=1.0, total_epoch=args.lr_warmup_steps, after_scheduler=scheduler_steplr)
-  # 可选地从检查点恢复
+  
   # optionally resume from a checkpoint
-  # 在需要时可以选择从一个检查点处恢复训练。在深度学习中，训练过程可能需要花费大量时间，因此定期保存模型参数的检查点是一种常见的做法。
-  # 如果训练过程中断或出现问题，您可以从最近的检查点处重新开始训练，而不必从头开始。
+  
+  
   if args.resume:
     if os.path.isfile(args.resume):
       print("=> loading checkpoint '{}'".format(args.resume))
@@ -420,19 +420,19 @@ def main_worker(gpu, ngpus_per_node, args):
 
   cudnn.benchmark = True
 
-  # Data loading code 加载数据集
+  
   train_dataset = data.get_dataset(args, 'train', tokenizer)
   val_dataset = data.get_dataset(args, 'val', tokenizer)
   print(f'Training with {len(train_dataset)} examples and validating with {len(val_dataset)} examples.')
-  # 分布式训练
+  
   if args.distributed:
-    # 创建了一个分布式的数据采样器 DistributedSampler，用于在分布式数据并行训练过程中对训练数据集进行采样。
+    
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, drop_last=True)
     val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
   else:
     train_sampler = None
     val_sampler = None
-  # 训练加载器
+  
   train_loader = torch.utils.data.DataLoader(
     train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
     num_workers=args.workers, pin_memory=True, sampler=train_sampler)
@@ -440,17 +440,17 @@ def main_worker(gpu, ngpus_per_node, args):
   val_loader = torch.utils.data.DataLoader(
     val_dataset, batch_size=(args.val_batch_size or args.batch_size), shuffle=False,
     num_workers=args.workers, pin_memory=True, sampler=val_sampler)
-  # 为真，对验证集评估
+  
   if args.evaluate:
     validate.validate(val_loader, model, tokenizer, criterion, epoch, args)
     return
   
   for epoch in range(args.start_epoch, args.epochs):
-    # epoch为0，开始评估
+    
     if epoch == 0:
       validate.validate(val_loader, model, tokenizer, criterion, epoch-1, args)
     if args.distributed:
-      # 设置分布式数据采样器 train_sampler 的当前 epoch 数为 epoch
+      
       train_sampler.set_epoch(epoch)
 
     # train for one epoch
@@ -482,9 +482,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
 # train
 def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler, args):
-  # 指标
-  ngpus_per_node = torch.cuda.device_count() #当前节点可用的gpu数
-  batch_time = utils.AverageMeter('Time', ':6.3f') # 处理批次的时间
+  
+  ngpus_per_node = torch.cuda.device_count() 
+  batch_time = utils.AverageMeter('Time', ':6.3f') 
   cap_time = utils.AverageMeter('CaptioningTime', ':6.3f')
   ret_time = utils.AverageMeter('RetrievalTime', ':6.3f')
   data_time = utils.AverageMeter('Data', ':6.3f')
@@ -503,9 +503,9 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
   inp_emb_norm = utils.AverageMeter('TextEmbNorm', ':.4e')
   all_emb_norm = utils.AverageMeter('AllEmbNorm', ':.4e')
   ret_emb_norm = utils.AverageMeter('RetEmbNorm', ':.4e')
-  # 创建log_dir日志
+  
   writer = SummaryWriter(args.log_dir)
-  # 调用utils.ProgressMeter类，用于管理和展示训练过程中的指标信息
+  
   progress = utils.ProgressMeter(
     args.steps_per_epoch,
     [batch_time, losses, ce_losses, cont_losses, gen_losses, top1, top5],
@@ -514,13 +514,13 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
   # switch to train mode
   model.train()
   end = time.time()
-  # 这里的ret_tokens和gen_tokens其实都是data.py函数里面返回的tokens（标记后的文本和caption切片的索引id）
+  
   for i, (_, images, caption_images, ret_tokens, ret_caption_len, gen_tokens, gen_caption_len, clip_emb) in enumerate(train_loader):
-    # 计算步骤总数=epochs*每epoch步数（一个batch是一个）+当前batch的索引+1
+    
     actual_step = epoch * args.steps_per_epoch + i + 1
     # measure data loading time
     data_time.update(time.time() - end)
-    # 如果CUDA可用，接下来的代码段会将数据移动到GPU上进行加速处理
+    
     if torch.cuda.is_available():
       images = images.cuda(args.gpu, non_blocking=True)
       ret_tokens = ret_tokens.cuda(args.gpu, non_blocking=True)
@@ -528,12 +528,12 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
       gen_tokens = gen_tokens.cuda(args.gpu, non_blocking=True)
       gen_caption_len = gen_caption_len.cuda(args.gpu, non_blocking=True)
       clip_emb = clip_emb.cuda(args.gpu, non_blocking=True)
-    # 精度
+    
     if args.precision == 'fp16':
       images = images.half()
     elif args.precision == 'bf16':
       images = images.bfloat16()
-    # model的工作模式：字幕， 检索， 生成
+    
     model_modes = ['captioning', 'retrieval', 'generation']
 
     loss = 0
@@ -542,7 +542,7 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
       print('Running', model_mode)
       mode_start = time.time()
       # compute output
-      # 随机生成的一个0到1之间的随机数，判断该随机数是否小于args.concat_captions_prob所设定的概率值，从而确定concat_captions变量的取值为True或False
+      
       concat_captions = random.uniform(0, 1) < args.concat_captions_prob
       
       if model_mode == 'retrieval':
@@ -551,7 +551,7 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
         tgt_tokens, token_len = gen_tokens, gen_caption_len
       else:
         tgt_tokens, token_len = ret_tokens, ret_caption_len  # For captioning, it doesn't matter.
-      # 注意这里的model是怎么设置的
+      
       (model_output, full_labels, last_embedding, _, visual_embs, visual_embs_norm,
         input_embs_norm, _) = model(images, tgt_tokens, token_len, mode=model_mode,
                                  concat_captions=concat_captions)
@@ -559,14 +559,14 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
       
       # Measure captioning accuracy for multi-task models and next-token prediction for retrieval models.
       if model_mode == 'captioning':
-        # 使用 utils.accuracy 函数计算输出 output 与标签 full_labels 的准确率，分别计算 top-1 和 top-5 的准确率。
+        
         acc1, acc5 = utils.accuracy(output[:, :-1, :], full_labels[:, 1:], -100, topk=(1, 5))
-        # 更新 top1 和 top5 变量，用于记录准确率信息
+        
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
-      # 模型输出赋值
+      
       ce_loss = model_output.loss
-      # 根据不同的 model_mode 值进行损失值的调整
+      
       if model_mode == 'captioning':
         ce_loss = ce_loss * args.cap_loss_scale
       elif model_mode == 'retrieval':
@@ -575,13 +575,13 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
         ce_loss = ce_loss * args.gen_loss_scale * 0.5
       else:
         raise NotImplementedError
-      # 累加的损失值，多任务损失函数的训练，累加的损失之按照论文中是训练决策模型！！！！ 
+      
       loss += ce_loss
       ce_losses.update(ce_loss.item(), images.size(0))
-      # 模型模式为 'retrieval' 时
+      
       if model_mode == 'retrieval':
         # Cross replica concat for embeddings.
-        # 跨 GPU 连接嵌入向量:
+        
         if args.distributed:
           all_visual_embs = [torch.zeros_like(visual_embs) for _ in range(dist.get_world_size())]
           all_last_embedding = [torch.zeros_like(last_embedding) for _ in range(dist.get_world_size())]
@@ -595,17 +595,17 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
 
           start_idx = args.rank * images.shape[0]
           end_idx = start_idx + images.shape[0]
-        # 计算逻辑
+        
         print(visual_embs.shape, last_embedding.shape)
-        # 计算图像和文本之间的逻辑值，其中 logits_per_image 表示图像嵌入向量和最后一个嵌入向量之间的逻辑值，logits_per_text 则表示其转置
+        
         logits_per_image = visual_embs @ last_embedding.t()
         logits_per_text = logits_per_image.t()
         if i == 0:
           print(f'Running contrastive loss over logits_per_text.shape = {logits_per_text.shape} and logits_per_image.shape = {logits_per_image.shape}')
-        # 使用损失函数 losses_utils.contrastive_loss 计算图像和文本的对比损失
+        
         caption_loss = losses_utils.contrastive_loss(logits_per_text)
         image_loss = losses_utils.contrastive_loss(logits_per_image)
-        # 使用损失函数 losses_utils.contrastive_loss 计算图像和文本的对比损失
+        
         caption_acc1, caption_acc5 = losses_utils.contrastive_acc(logits_per_text, topk=(1, 5))
         image_acc1, image_acc5 = losses_utils.contrastive_acc(logits_per_image, topk=(1, 5))
         loss += args.ret_loss_scale * (caption_loss + image_loss) / 2.0
@@ -627,7 +627,7 @@ def train(train_loader, model, tokenizer, criterion, optimizer, epoch, scheduler
         loss += gen_loss
         gen_losses.update(gen_loss.item(), images.size(0))
 
-      # 嵌入向量归一化？什么东西
+      
       if model_mode == 'retrieval':
         ret_vis_emb_norm.update(visual_embs_norm.item(), images.size(0))
       elif model_mode == 'captioning':

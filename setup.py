@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 import os
 
-# 获取当前目录
+# get current dir
 CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 

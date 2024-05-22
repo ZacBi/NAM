@@ -83,7 +83,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
             use detect model to mask the target cls
         """
         if target_cls_id == -1 or self.det_model is None:
-            # 返回一个identity矩阵
+            
             return torch.ones_like(image, dtype=torch.bool)
 
         # clone and detach
@@ -108,9 +108,9 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         instances = predictions['instances']
         pred_masks = instances.pred_masks
         pred_classes = instances.pred_classes
-        # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
+        
         mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
-        # 扩张到和image同样的维度
+        
         return mask.unsqueeze(0).repeat(channel, 1, 1).permute(1, 2, 0)
 
     def gradients_attribution(
@@ -207,7 +207,7 @@ class Trainer:
         file_dir = path.join(self.data_path, 'image/{}'.format(curr_file_name))
 
         if not path.exists(file_dir):
-            # 如果目录不存在，则创建它
+            
             os.makedirs(file_dir, exist_ok=True)
             print(f"目录 {file_dir} 已创建。")
         else:
@@ -261,9 +261,9 @@ class Trainer:
         """
             target_cls_id = 15 为 cat
             n_last_diffusion_steps_to_consider_for_attributions 这个参数需要check，判断上下界
-            # 1. sd 向前传播
-            # 2. eva图像分割获取目标区域mask
-            # 3. sd-interpret根据mask进行归因
+            
+            
+            
         """
         if  prompt is None and prompt_embeds is None:
             raise ValueError("prompt and prompt_embeddin can't all be None")

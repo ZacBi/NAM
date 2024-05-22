@@ -74,7 +74,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
             .numpy()
         )
 
-        # 直接传入embeddings时, 不存在tokens, 需要mock
+        
         if tokens is None:
             tokens = [[str(i) for i in range(raw_embeds.shape[1])]]
 
@@ -96,7 +96,7 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         use detect model to mask the target cls
         """
         if target_cls_id == -1 or self.det_model is None:
-            # 返回一个identity矩阵
+            
             return torch.ones_like(image, dtype=torch.bool)
 
         # clone and detach
@@ -124,9 +124,9 @@ class StableDiffusionPipelineDetExplainer(StableDiffusionPipelineExplainer):
         instances = predictions["instances"]
         pred_masks = instances.pred_masks
         pred_classes = instances.pred_classes
-        # 预测的class tensor可能为[cat, chair, cat], 需要merge boolean matrix
+        
         mask = torch.any(pred_masks[pred_classes == target_cls_id], dim=0)
-        # 扩张到和image同样的维度
+        
         return mask.unsqueeze(0).repeat(channel, 1, 1).permute(1, 2, 0)
 
     def gradients_attribution(

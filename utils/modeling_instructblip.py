@@ -55,7 +55,7 @@ INSTRUCTBLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
 
 
 @dataclass
-# 从transformers.models.blip_2.modeling_blip_2.Blip2ForConditionalGenerationModelOutputcopy过来的，把blip2替换成instructBlip
+
 # Copied from transformers.models.blip_2.modeling_blip_2.Blip2ForConditionalGenerationModelOutput with Blip2->InstructBlip
 class InstructBlipForConditionalGenerationModelOutput(ModelOutput):
     """
@@ -73,19 +73,19 @@ class InstructBlipForConditionalGenerationModelOutput(ModelOutput):
         language_model_outputs (`CausalLMOutputWithPast` or `Seq2SeqLMOutput`):
             Outputs of the language model.
     """
-# Optional，表示该变量可以是指定类型的数据，也可以是 None。在这里，指定类型为 Tuple[torch.FloatTensor]，即一个由 torch.FloatTensor 类型组成的元组
+
     loss: Optional[Tuple[torch.FloatTensor]] = None
     logits: Optional[Tuple[torch.FloatTensor]] = None
     vision_outputs: Optional[torch.FloatTensor] = None
     qformer_outputs: Optional[Tuple[torch.FloatTensor]] = None
     language_model_outputs: Optional[Tuple[torch.FloatTensor]] = None
-    # 返回类型为 Tuple[Any]，表示返回一个由任意类型数据组成的元组。
-    # self 是一个对象实例，通常是一个类的实例，而 k 则是一个键（key），返回self实例中所有的值（元组形式）
+    
+    
     def to_tuple(self) -> Tuple[Any]:
         return tuple(
             self[k]
             if k not in ["vision_outputs", "qformer_outputs", "language_model_outputs"]
-            # getattr用于获取对象的属性值。
+            
             else getattr(self, k).to_tuple()
             for k in self.keys()
         )
@@ -93,7 +93,7 @@ class InstructBlipForConditionalGenerationModelOutput(ModelOutput):
 
 # Copied from transformers.models.blip.modeling_blip.BlipVisionEmbeddings with Blip->InstructBlip
 # visionembedding
-# InstructBlipVisionConfig这个应该是自己定义的一种配置变量类
+
 class InstructBlipVisionEmbeddings(nn.Module):
     def __init__(self, config: InstructBlipVisionConfig):
         super().__init__()
@@ -101,45 +101,45 @@ class InstructBlipVisionEmbeddings(nn.Module):
         self.embed_dim = config.hidden_size
         self.image_size = config.image_size
         self.patch_size = config.patch_size
-        # 随机初始化了一个模型参数
-        # class_embedding 是一个类成员变量（属性），通常用来表示模型中的类别嵌入
+        
+        
         self.class_embedding = nn.Parameter(torch.randn(1, 1, self.embed_dim))
-        # patch_embedding 通常用来表示图像中的图像块（patches）嵌入的操作或模块
-        # self.patch_embedding 是一个 nn.Conv2d 的实例，它被用来实现图像块的转换操作，将输入的图像分成小的图像块并将其映射到嵌入空间中。
-        # out_channels=self.embed_dim。输出的通道数也就是嵌入维度
-        # kernel_size和stride大小相同，确保不重叠的提取图像块
+        
+        
+        
+        
         self.patch_embedding = nn.Conv2d(
             in_channels=3, out_channels=self.embed_dim, kernel_size=self.patch_size, stride=self.patch_size
         )
-        # self.num_patches通常用来表示图像被分成的图像块数量
+        
         self.num_patches = (self.image_size // self.patch_size) ** 2
-        # 这个变量通常用来表示位置编码中的位置数量，图像块数量加上一个额外的位置用于表示全局位置
+        
         self.num_positions = self.num_patches + 1
-        # self.num_positions个位置编码
+        
         self.position_embedding = nn.Parameter(torch.randn(1, self.num_positions, self.embed_dim))
-    # 像素值（应该是有好多张图片作为batch）作为输入，返回torch.Tensor类型
+    
     def forward(self, pixel_values: torch.FloatTensor) -> torch.Tensor:
         batch_size = pixel_values.shape[0]
-        # 获取了 self.patch_embedding 层的权重张量的数据类型
+        
         target_dtype = self.patch_embedding.weight.dtype
-        # 这行代码将输入的 pixel_values 通过 self.patch_embedding 层进行处理，得到图像块的嵌入表示。
-        # 处理后的 patch_embeds 张量的形状为 [*, width, grid, grid]，其中 * 表示其他维度，width 是宽度，grid 是网格大小。
-        # 这里我感觉是图像块是grid*grid编码，width就是分割成多少图像块，一个picture
+        
+        
+        
         patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
-        # 展平为[*, width, grid*grid]，transpose 操作将第1维和第2维交换位置[*, grid*grid， width]
+        
         patch_embeds = patch_embeds.flatten(2).transpose(1, 2)
         # self.class_embedding.expand(batch_size, 1, -1) [batch_size, 1, -1]
         class_embeds = self.class_embedding.expand(batch_size, 1, -1).to(target_dtype)
-        # 这行代码将类别嵌入和图像块嵌入拼接在一起，形成最终的嵌入表示 embeddings，在第1维度上进行拼接。
+        
         embeddings = torch.cat([class_embeds, patch_embeds], dim=1)
-        # 这行代码将位置编码与之前的嵌入表示相加，以获得最终的位置编码嵌入。位置编码已经在前面定义好，通过索引和类型转换操作来与嵌入表示相加
+        
         embeddings = embeddings + self.position_embedding[:, : embeddings.size(1), :].to(target_dtype)
         return embeddings
 
 
 # Copied from transformers.models.blip_2.modeling_blip_2.Blip2Attention with Blip2->InstructBlip
 class InstructBlipAttention(nn.Module):
-    # 多头注意力机制
+    
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(self, config):
@@ -148,21 +148,21 @@ class InstructBlipAttention(nn.Module):
         self.embed_dim = config.hidden_size
         self.num_heads = config.num_attention_heads
         self.head_dim = self.embed_dim // self.num_heads
-        # 要求整除
+        
         if self.head_dim * self.num_heads != self.embed_dim:
             raise ValueError(
                 f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim} and `num_heads`:"
                 f" {self.num_heads})."
             )
-        # 缩放注意力机制中的点积注意力矩阵
+        
         self.scale = self.head_dim**-0.5
-        # 池化层
+        
         self.dropout = nn.Dropout(config.attention_dropout)
 
         # small tweak here compared to CLIP, no bias here
-        # 定义了一个线性变换层 self.qkv，输入维度为 self.embed_dim，输出维度为 3 * self.embed_dim，并且不使用偏置（bias=False）
+        
         self.qkv = nn.Linear(self.embed_dim, 3 * self.embed_dim, bias=False)
-        # 根据配置中 config.qkv_bias 的设置，来决定是否为查询（Q）和值（V）添加偏置
+        
         if config.qkv_bias:
             q_bias = nn.Parameter(torch.zeros(self.embed_dim))
             v_bias = nn.Parameter(torch.zeros(self.embed_dim))
@@ -173,11 +173,11 @@ class InstructBlipAttention(nn.Module):
         if q_bias is not None:
             qkv_bias = torch.cat((q_bias, torch.zeros_like(v_bias, requires_grad=False), v_bias))
             self.qkv.bias = nn.Parameter(qkv_bias)
-        # 最后这个线性层是什么
+        
         self.projection = nn.Linear(self.embed_dim, self.embed_dim)
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
-        # 先调用 view 方法对张量进行重塑操作，将其变换为形状为 (batch_size, seq_len, num_heads, head_dim)
+        
         # transpose (batch_size, num_heads, seq_len, head_dim)
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
 
@@ -188,25 +188,25 @@ class InstructBlipAttention(nn.Module):
         output_attentions: Optional[bool] = False,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
-        # bsz: 表示 batch size，即批次大小，表示输入数据中样本的数量。
-        # tgt_len: 表示 target length，即目标长度，通常用来表示序列的长度。
-        # embed_dim: 表示 embedding dimension，即嵌入维度，通常用来表示词嵌入或者特征的维度。
-        # hidden_states 可能表示模型中某一层的隐藏状态或者输出
+        
+        
+        
+        
         bsz, tgt_len, embed_dim = hidden_states.size()
 
         mixed_qkv = self.qkv(hidden_states)
-        # 这里的参数 (2, 0, 3, 1, 4) 指定了新的维度排列顺
-        # 最后一个维度是head_dim,表示每个注意力头的维度
-        # batch_size 是批次大小，即样本数量。
-        # tgt_len 是目标长度，表示序列的长度。
-        # 3 表示有三个部分，分别对应查询（Q）、键（K）和值（V）。
-        # num_heads 是多头注意力机制中的头数。
-        # head_dim 是每个注意力头的维度。
-        # 将第二维移到最前面，也就是3：表示Q,K,V
+        
+        
+        
+        
+        
+        
+        
+        
         mixed_qkv = mixed_qkv.reshape(bsz, tgt_len, 3, self.num_heads, embed_dim // self.num_heads).permute(
             2, 0, 3, 1, 4
         )
-        # 第一个维度的三个向量矩阵分别是固定的q,k,v经过Q,K,V后
+        
         query_states, key_states, value_states = mixed_qkv[0], mixed_qkv[1], mixed_qkv[2]
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
@@ -222,18 +222,18 @@ class InstructBlipAttention(nn.Module):
         attention_probs = self.dropout(attention_probs)
 
         # Mask heads if we want to
-        # 对注意力矩阵进行掩码操作
-        # 存在一个名为 head_mask 的掩码张量
+        
+        
         if head_mask is not None:
             attention_probs = attention_probs * head_mask
 
         context_layer = torch.matmul(attention_probs, value_states).permute(0, 2, 1, 3)
-        # 将 context_layer 的最后两个维度（通常是序列长度和隐藏单元数）替换为 self.embed_dim，以便后续投影操作。
-        # 最后两个维度一般是注意力头数和每个头的维度
+        
+        
         new_context_layer_shape = context_layer.size()[:-2] + (self.embed_dim,)
-        # reshape得到新形状
+        
         context_layer = context_layer.reshape(new_context_layer_shape)
-        # 多头注意力
+        
         output = self.projection(context_layer)
 
         outputs = (output, attention_probs) if output_attentions else (output, None)
@@ -246,9 +246,9 @@ class InstructBlipMLP(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        # 从预定义的激活函数字典 ACT2FN 中获取配置中指定的激活函数，并保存在 self.activation_fn 中
+        
         self.activation_fn = ACT2FN[config.hidden_act]
-        # 两个线性层
+        
         self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
@@ -264,9 +264,9 @@ class InstructBlipEncoderLayer(nn.Module):
     def __init__(self, config: InstructBlipConfig):
         super().__init__()
         self.embed_dim = config.hidden_size
-        # 多头注意力层
+        
         self.self_attn = InstructBlipAttention(config)
-        # 归一化层--MLP--归一化层
+        
         self.layer_norm1 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
         self.mlp = InstructBlipMLP(config)
         self.layer_norm2 = nn.LayerNorm(self.embed_dim, eps=config.layer_norm_eps)
@@ -287,7 +287,7 @@ class InstructBlipEncoderLayer(nn.Module):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under
                 returned tensors for more detail.
         """
-        # 保存变量以便后续进行残差连接
+        
         residual = hidden_states
 
         hidden_states = self.layer_norm1(hidden_states)
@@ -319,11 +319,11 @@ class InstructBlipPreTrainedModel(PreTrainedModel):
     """
 
     config_class = InstructBlipConfig
-    # 基础模型前缀
+    
     base_model_prefix = "blip"
-    # 模型是否支持梯度检查点（gradient checkpointing）技术
+    
     supports_gradient_checkpointing = True
-    # 一组模块的名称
+    
     _no_split_modules = ["InstructBlipAttention", "InstructBlipQFormerMultiHeadAttention"]
     _keep_in_fp32_modules = []
 
@@ -617,13 +617,13 @@ class InstructBlipQFormerMultiHeadAttention(nn.Module):
                 "The hidden size (%d) is not a multiple of the number of attention heads (%d)"
                 % (config.hidden_size, config.num_attention_heads)
             )
-        # 注意力头数
+        
         self.num_attention_heads = config.num_attention_heads
-        # 每个头的注意力维度
+        
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
-        # 难道不等于hidden_size吗？ 应该是相等的，因为上面已经满足可以整除
+        
         self.all_head_size = self.num_attention_heads * self.attention_head_size
-        # 这就是查询向量learnable_query
+        
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         if is_cross_attention:
             self.key = nn.Linear(config.encoder_hidden_size, self.all_head_size)
@@ -631,42 +631,42 @@ class InstructBlipQFormerMultiHeadAttention(nn.Module):
         else:
             self.key = nn.Linear(config.hidden_size, self.all_head_size)
             self.value = nn.Linear(config.hidden_size, self.all_head_size)
-        # config.attention_probs_dropout_prob丢弃概率
+        
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
-        # getattr(config, "position_embedding_type", "absolute")会确认是否存在该属性，然后如果需要的话返回属性对应的值
-        # 从 config 对象中获取 position_embedding_type 属性的值，如果该属性不存在，则使用默认值 "absolute"。
-        # 这个属性用于指定位置编码（Positional Embedding）的类型，可以是 "absolute"、"relative_key" 或 "relative_key_query"。
+        
+        
+        
         self.position_embedding_type = getattr(config, "position_embedding_type", "absolute")
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
-            # 第一个参数 2 * config.max_position_embeddings - 1：表示嵌入层要处理的不同索引的数量，即嵌入的维度大小。在这里，计算出的数量为 2 * config.max_position_embeddings - 1，即索引范围为从 0 到 (2 * config.max_position_embeddings - 2)。
-            # 第二个参数 self.attention_head_size：表示每个嵌入向量的维度大小，即每个索引会映射为一个长度为 self.attention_head_size 的向量。
+            
+            
             self.max_position_embeddings = config.max_position_embeddings
             self.distance_embedding = nn.Embedding(2 * config.max_position_embeddings - 1, self.attention_head_size)
         self.save_attention = False
-    # 用于保存传入的注意力梯度（attention gradients）到实例的属性 self.attn_gradients 中
+    
     def save_attn_gradients(self, attn_gradients):
         self.attn_gradients = attn_gradients
-    # 返回保存在实例属性 self.attn_gradients 中的注意力梯度
+    
     def get_attn_gradients(self):
         return self.attn_gradients
-    # 用于保存传入的注意力图（attention map）到实例的属性 self.attention_map 中
+    
     def save_attention_map(self, attention_map):
         self.attention_map = attention_map
-    # 返回保存在实例属性 self.attention_map 中的注意力图
+    
     def get_attention_map(self):
         return self.attention_map
-    # 用于将输入张量进行形状变换，以便适应注意力头的形状。在这个方法中，张量 x 被重新排列为一个新的形状，然后执行维度置换操作以返回变换后的张量
+    
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
-    # 表示模型的输入隐藏状态（hidden states），通常是待处理的序列数据或特征表示
-    # 用于指定哪些位置需要被掩盖的注意力掩码（attention mask）。掩盖的位置将不被模型考虑。
-    # 用于指定哪些注意力头应该被屏蔽的头掩码（head mask），以便控制注意力头的作用
-    # 编码器的隐藏状态（encoder hidden states），通常用于交叉注意力（cross-attention）任务中，作为键和值的来源。
-    # 编码器的注意力掩码（encoder attention mask），用于指定编码器中哪些位置需要被掩盖。
-    # 用于存储过去的键值对，以便支持自回归模型的解码。
-    # 一个布尔值，表示是否输出注意力权重。如果设置为True，函数将返回注意力权重的信息。
+    
+    
+    
+    
+    
+    
+    
     def forward(
         self,
         hidden_states,
@@ -680,8 +680,8 @@ class InstructBlipQFormerMultiHeadAttention(nn.Module):
         # If this is instantiated as a cross-attention module, the keys
         # and values come from an encoder; the attention mask needs to be
         # such that the encoder's padding tokens are not attended to.
-        # 如果这个被实例化为交叉注意力模块，那么键（keys）和值（values）来自一个编码器；注意力掩码（attention mask）需要使编码器的填充标记不被关注
-        # 非空，置为true，表示这个对象将被用作交叉注意力模块。
+        
+        
         is_cross_attention = encoder_hidden_states is not None
 
         if is_cross_attention:
@@ -697,44 +697,42 @@ class InstructBlipQFormerMultiHeadAttention(nn.Module):
         else:
             key_layer = self.transpose_for_scores(self.key(hidden_states))
             value_layer = self.transpose_for_scores(self.value(hidden_states))
-        # 这里面的layer其实是Q,K,V经过矩阵Q,K,V处理后得到的结果
+        
         mixed_query_layer = self.query(hidden_states)
 
         query_layer = self.transpose_for_scores(mixed_query_layer)
 
         past_key_value = (key_layer, value_layer)
-        # 计算Q*K的转置
+        
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
 
-        ##### 计算相对位置编码（relative positional embedding）对注意力得分（attention scores）的影响
-        # 通过检查 self.position_embedding_type 的值是否为 "relative_key" 或 "relative_key_query" 来确定是否需要计算相对位置编码
+        ####
+        
         if self.position_embedding_type == "relative_key" or self.position_embedding_type == "relative_key_query":
-            # 第一维（索引 0）是 batch_size，表示一个批次中样本的数量。
-            # 第二维（索引 1）是 sequence_length，表示序列的长度，即时间步数或序列中的元素数量。
-            # 第三维（索引 2）是 hidden_size，表示每个时间步或元素的隐藏状态向量的维度大小。
-            # 计算相对位置编码！！！ position_ids_l表示左侧，position_ids_r表示右侧
+            
+            
+            
+            
             seq_length = hidden_states.size()[1]
-            # 列向量：（1，seq_length-1)，用于表示左侧位置地ID
+            
             position_ids_l = torch.arange(seq_length, dtype=torch.long, device=hidden_states.device).view(-1, 1)
-            # 行向量: (1, seq_length-1)， 用于表示右侧位置ID
+            
             position_ids_r = torch.arange(seq_length, dtype=torch.long, device=hidden_states.device).view(1, -1)
-            # 广播机制：得到[seq_length-1, seq_length-1]的向量
-            # 例如三维的distance，最后得到是这样的结果
+            
+            
             # 0 -1 -2
             # 1  0 -1
             # 2  1  0
             distance = position_ids_l - position_ids_r
-            # 使用位置编码模型（self.distance_embedding）计算相对位置编码张量 positional_embedding，并将其转换为和 query_layer 张量相同的数据类型。
+            
             positional_embedding = self.distance_embedding(distance + self.max_position_embeddings - 1)
             positional_embedding = positional_embedding.to(dtype=query_layer.dtype)  # fp16 compatibility
-            # 根据 self.position_embedding_type 的值，分别计算相对位置得分（relative_position_scores）
-            # 仅使用查询张量 query_layer 和位置编码张量计算得分，并将得分添加到注意力得分中
+            
+            
             if self.position_embedding_type == "relative_key":
                 relative_position_scores = torch.einsum("bhld,lrd->bhlr", query_layer, positional_embedding)
                 attention_scores = attention_scores + relative_position_scores
-            # self.position_embedding_type 是 "relative_key_query"，则同时使用查询张量和键张量与位置编码张量计算得分，并将这两个得分添加到注意力得分中
-            '''在注意力机制中引入相对位置，具体数学原理不知，反正可以使模型在计算注意力权重的时候考虑相对位置关系'''
             elif self.position_embedding_type == "relative_key_query":
                 relative_position_scores_query = torch.einsum("bhld,lrd->bhlr", query_layer, positional_embedding)
                 relative_position_scores_key = torch.einsum("bhrd,lrd->bhlr", key_layer, positional_embedding)
@@ -745,39 +743,39 @@ class InstructBlipQFormerMultiHeadAttention(nn.Module):
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
             attention_scores = attention_scores + attention_mask
-        # 归一化操作
+        
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
         if is_cross_attention and self.save_attention:
-            # 保存注意力权重
+            
             self.save_attention_map(attention_probs)
-            # 将 save_attn_gradients 方法注册为 attention_probs 的梯度钩子。这可以用来在反向传播过程中保存注意力权重的梯度信息，以便进行梯度分析或其他操作
-            # 度钩子允许用户在张量的梯度被计算时执行额外的操作，比如记录梯度、修改梯度或者梯度可视化：
+            
+            
             attention_probs.register_hook(self.save_attn_gradients)
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
-        # 将一些token置为0
+        
         attention_probs_dropped = self.dropout(attention_probs)
 
-        # 主要用于计算上下文向量 context_layer
+        
         # Mask heads if we want to
         if head_mask is not None:
-            # 如果提供了头注意力掩码，则将注意力权重 attention_probs_dropped 与头注意力掩码相乘，实现对特定注意力头的屏蔽操作。
-            # attention_probs_dropped是什么？ 注意力权重（attention_probs）表示了每个查询向量对所有键值对的注意力分配，这里的查询向量是可学习的query_tokens,键值对是注意力机制中的value矩阵和key矩阵
+            
+            
             attention_probs_dropped = attention_probs_dropped * head_mask
-        # 根据注意力权重 attention_probs_dropped 和值矩阵 value_layer 计算上下文向量
+        
         context_layer = torch.matmul(attention_probs_dropped, value_layer)
-        # 对计算得到的上下文向量进行维度置换，以便后续的形状变换操作
+        
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        # 根据上下文向量的维度计算新的形状，用于进行下一步的形状变换
+        
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-        # 根据新的形状对上下文向量进行形状变换，将其重新排列为期望的形状。
+        
         context_layer = context_layer.view(*new_context_layer_shape)
-        # 根据新的形状对上下文向量进行形状变换，将其重新排列为期望的形状。
+        
         outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
-        # 将过去的键值对信息 past_key_value 添加到输出元组中。
+        
         outputs = outputs + (past_key_value,)
         return outputs
 
@@ -1388,27 +1386,27 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
 
     def get_model(self):
         return self.model
-    # 用于设置获取得分的相关参数
+    
     def set_get_scores(self, start, end):
         self.scores = []
         self.cal_score = True
         self.start = start
         self.end = end
-    # 用于设置获取新得分的相关参数
+    
     def set_get_new_scores(self, start, end):
         self.new_scores = []
         self.cal_new_score = True
         self.start = start
         self.end = end
-    # 用于设置模型获取激活值的相关参数
-    # start 和 end 是作为参数传递给这个函数的起始和结束位置的值
+    
+    
     def set_get_activations(self, start, end):
-        # 将模型的激活值 self.activations 和 self.last_activation 设置为初始状态，即置为 None 和空列表 []
+        
         self.activations = None
         self.last_activation = []
-        # 将计算激活值的标志 self.cal_activations 设置为 True，表示需要计算激活值。
+        
         self.cal_activations = True
-        # 将计算激活值的标志 self.cal_activations 设置为 True，表示需要计算激活值。
+        
         self.start = start
         self.end = end
 
@@ -1426,7 +1424,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
 
     def set_idx(self, idx):
         self.idx = idx
-    # 返回语言模型的输入嵌入
+    
     def get_input_embeddings(self):
         return self.language_model.get_input_embeddings()
     def set_input_embeddings(self, value):
@@ -1449,7 +1447,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
         # if not self.config.use_decoder_only_language_model:
         #     self.language_model.encoder.embed_tokens = self.language_model.shared
         #     self.language_model.decoder.embed_tokens = self.language_model.shared
-    # 这个函数包含了一些预处理的操作，以使模型兼容 accelerate 加速库
+    
     def _preprocess_accelerate(self):
         r"""
         Some pre-processing hacks to make the model `accelerate` compatible. Check
@@ -1476,27 +1474,27 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
     )
     def forward(
         self,
-        # pixel_values: 图像的像素值，类型为 torch.FloatTensor
+        
         pixel_values: torch.FloatTensor = None,
-        # qformer_input_ids: Q-Former 的输入标记，类型为 torch.FloatTensor
+        
         qformer_input_ids: torch.FloatTensor = None,
-        # 可选的 Q-Former 注意力掩码，类型为 torch.LongTensor
+        
         qformer_attention_mask: Optional[torch.LongTensor] = None,
-        # 过去的键值
+        
         past_key_values: Optional[List[torch.FloatTensor]] = None,
-        # 是否使用缓存，类型为 bool
+        
         use_cache: Optional[bool] = None,
-        # 输入标记
+        
         input_ids: Optional[torch.FloatTensor] = None,
-        # 注意力掩码
+        
         attention_mask: Optional[torch.LongTensor] = None,
-        # 是否输出注意力
+        
         output_attentions: Optional[bool] = None,
-        # 是否输出隐藏状态
+        
         output_hidden_states: Optional[bool] = None,
-        #  用于计算语言模型损失的标签
+        
         labels: Optional[torch.LongTensor] = None,
-        # 是否返回字典形式的输出
+        
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, InstructBlipForConditionalGenerationModelOutput]:
         r"""
@@ -1547,7 +1545,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
         # print(qformer_input_ids)
         # print(qformer_attention_mask)
 
-        # 这段代码是模型前向传播中的第一步，通过视觉编码器（vision_model）将图像数据进行处理，以获取图像嵌入（image embeddings）
+        
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
         vision_outputs = self.vision_model(
@@ -1597,7 +1595,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
         if self.shuffle:
             idx = torch.cat([self.idx, torch.tensor(range(32, inputs_embeds.shape[1]))], dim=0)
             inputs_embeds = inputs_embeds[:, idx]
-        # 每个空列表都代表一个隐藏层，检查是否需要记录激活值。
+        
         if self.cal_activations:
             self.act = [[] for _ in range(self.config.num_hidden_layers)]
             
@@ -1606,7 +1604,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
                     self.act[n].append(output.detach())
 
                 return fn
-            # 这里的这种模型架构是需要自己去写吗，为每一层注册hook
+            
             handle_act = [self.language_model.model.layers[n].mlp.act_fn.register_forward_hook(forward_hook(n)) for n in
                           range(self.config.num_hidden_layers)]
 
@@ -1626,7 +1624,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
 
 
         if self.cal_activations:
-            # 获取每个隐藏层的最后一个激活值
+            
             last_activation = [(self.act[n][0].detach()[0, -1, :]).half().cpu() for n in
                                range(self.config.num_hidden_layers)]
             self.last_activation.append(last_activation)
@@ -1634,12 +1632,12 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
                 del h
 
         return outputs
-# 准备模型生成（generation）时的输入参数
+
     def prepare_inputs_for_generation(
             self, input_ids, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
-        # 方法接受多个参数：
-        # 包括输入的 input_ids、过去的键值对（past_key_values，默认为 None）、注意力掩码（attention_mask，默认为 None）、输入的嵌入（inputs_embeds，默认为 None）以及其他关键字参数 **kwargs
+        
+        
         # if self.cal_score or self.cal_activations:
         past_key_values = None
         if past_key_values:
