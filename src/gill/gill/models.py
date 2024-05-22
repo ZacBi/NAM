@@ -32,10 +32,12 @@ class GILLArgs:
   ret_text_fc_mode: str = 'linear'
   num_tokens: int = 8
   num_clip_tokens: int = 77
+
 class GILLModel_1(nn.Module):
   def __init__(self, args: GILLArgs = GILLArgs()):
     super().__init__()
     self.lm = OPTForCausalLM.from_pretrained(pretrained_model_name_or_path="/data/ruip/eva02/gill_done/transformer_cache/opt")
+
 class GILLModel(nn.Module):
   def __init__(self, tokenizer, args: GILLArgs = GILLArgs()):
     super().__init__()

@@ -89,7 +89,7 @@ target/
 .mypy_cache/
 .DS_Store
 
-# python 
+# python
 ./src/gill/demo/act_compute.py
 ./src/gill/demo/compute_act.py
 ./src/gill/demo/compute_act1.py

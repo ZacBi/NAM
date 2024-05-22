@@ -3,10 +3,22 @@ from os import path
 import torch
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import LazyConfig, instantiate
-from diffusers import AutoPipelineForText2Image, DiffusionPipeline
+from diffusers import AutoPipelineForText2Image
 from diffusers_interpret import StableDiffusionPipelineDetExplainer
 from gill import layers
 from torch.cuda import amp
+
+# targe class idx, dog is 15
+target_cls_id=15
+
+# path to save attribution for pic over generation embeds of gill
+save_path = '/mnt/workspace/data/tensor/gill_interpret_weight.pt'
+
+# path to raw_embeds an gen_prefix_embs of gill
+raw_emb_path = '/mnt/workspace/data/tensor/raw_emb_tensor_cat_1.pt'
+gen_prefix_embs_path = '/mnt/workspace/data/tensor/gen_prefix_embs_tensor_cat_1.pt'
+
+gill_state_dict_path = '/mnt/workspace/github/gill/checkpoints/gill_opt/pretrained_ckpt.pth.tar'
 
 
 model_path = '/mnt/workspace/model'
@@ -43,15 +55,15 @@ sd_pipe = AutoPipelineForText2Image.from_pretrained(
 explainer = StableDiffusionPipelineDetExplainer(pipe=sd_pipe, det_model=eva)
 
 # shape of llm output is  (batch_size, seq_len, hidden_dim)
-raw_emb = torch.load('/mnt/workspace/data/tensor/raw_emb_tensor_cat_1.pt').to(torch_dtype)
+raw_emb = torch.load(raw_emb_path).to(torch_dtype)
 raw_emb.requires_grad_(True)
 # embedding img0-imge8
-gen_prefix_embs = torch.load('/mnt/workspace/data/tensor/gen_prefix_embs_tensor_cat_1.pt').to(torch_dtype)
+gen_prefix_embs = torch.load(gen_prefix_embs_path).to(torch_dtype)
 gen_prefix_embs.requires_grad_(True)
 
 # gill_mapper: linear + Transformer + linear
 gen_text_hidden_fcs = layers.GenTextHiddenFcs()
-gill_state_dict = torch.load('/mnt/workspace/github/gill/checkpoints/gill_opt/pretrained_ckpt.pth.tar')
+gill_state_dict = torch.load(gill_state_dict_path)
 
 gen_text_hidden_fcs_state_dict = {}
 for key, val in gill_state_dict['state_dict'].items():
@@ -68,11 +80,11 @@ with torch.cuda.amp.autocast(dtype=torch.float16):
     output = explainer(
         prompt_embeds=gen_emb,
         num_inference_steps=50,
-        target_cls_id=15,
+        target_cls_id=target_cls_id,
         raw_embeds=raw_emb,
         n_last_diffusion_steps_to_consider_for_attributions=1
     )
-print(output.token_attributions)
+
 for token, arr in output.token_attributions:
     if token== '0':
         print(token)
@@ -82,5 +94,5 @@ for token, arr in output.token_attributions:
         print("ssss:", token)
         tensor = torch.tensor(arr, dtype=torch.float16)
         weight_pixes = torch.cat((weight_pixes, tensor.unsqueeze(0)), dim=0)
-print(weight_pixes.size())
-torch.save(weight_pixes, "/mnt/workspace/github/SNPA/src/gill/weigth.pt")
+
+torch.save(weight_pixes, save_path)

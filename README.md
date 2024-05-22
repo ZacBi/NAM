@@ -1,7 +1,38 @@
-nam
+NAM
 ==============================
 
 Neuron Attribution method tailored for MLLMs
+
+# Installation
+
+```bash
+conda create -n nam python=3.8
+conda activate nam
+pip install -e .
+```
+
+# Reproduce
+
+### compute scores for neurons over prompts in llm model
+
+```bash
+# modify src/gill/evals/compute_scores_max.py to match your config
+python src/gill/evals/compute_scores_max.py
+```
+
+### compute attribution for generated images over the generated embeds of llm model
+
+```bash
+# modify src/gill/generated_image_interpret.py to match your config
+python src/gill/generated_image_interpret.py
+```
+
+### compute the attribution of each neurons in ffn layers to the generated images
+
+```bash
+# modify src/gill/evals/pic_attribution.py to match your config
+python src/gill/evals/pic_attribution.py
+```
 
 Project Organization
 ------------
