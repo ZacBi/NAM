@@ -88,3 +88,15 @@ target/
 # Mypy cache
 .mypy_cache/
 .DS_Store
+
+# python 
+./src/gill/demo/act_compute.py
+./src/gill/demo/compute_act.py
+./src/gill/demo/compute_act1.py
+./src/gill/demo/compute_act2.py
+./src/gill/demo/compute_act_new.py
+./src/gill/demo/nethook.py
+./src/gill/demo/repr_tools.py
+./src/gill/demo/share_btn.py
+./src/gill/demo/test.py
+./src/gill/demo/test1.py
