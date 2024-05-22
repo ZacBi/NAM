@@ -100,3 +100,5 @@ target/
 ./src/gill/demo/share_btn.py
 ./src/gill/demo/test.py
 ./src/gill/demo/test1.py
+./src/gill/demo/models.py
+./src/gill/demo/utils.py
