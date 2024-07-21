@@ -3,45 +3,59 @@ import torch
 from transformers import OPTForCausalLM
 
 
-
 # model：In order to reduce the use of video memory, the model here uses the GILLModel_1 in the models to initialize the model
 # weight：The pre-obtained raw_emb the weight of each element
 # act：Subject activation value on each floor：subject here means IMG0 IMG1…… ，IMG7
 def getWout(model):
-    # Assuming you are using the first layer for simplicity
-    Wout_t = model.lm.model.decoder.layers[0].fc2.weight.t()
-    Wout = Wout_t.unsqueeze(0)
-    for i in range(1, 32):
-        Wout_t = model.lm.model.decoder.layers[i].fc2.weight.t()
-        Wout = torch.cat((Wout, Wout_t.unsqueeze(0)))
-    return Wout  # (32,16384,4096)
+    """
+    获取模型所有解码器层的输出权重矩阵。
+
+    参数:
+    - model: 模型对象，其中包含了要获取权重的解码器层。
+
+    返回值:
+    - Wout: 所有解码器层的输出权重组成的张量，形状为（层数，输入特征数，输出特征数）。
+    """
+
+    # 提取所有解码器层的输出权重
+    weights = [layer.fc2.weight.t() for layer in model.lm.model.decoder.layers]
+
+    # 将所有权重堆叠成一个张量
+    Wout = torch.stack(weights)
+
+    return Wout  # 形状为（32, 16384, 4096）
 # act: (8, 32, 16384) 8:nums of token
 
 
+def normalize_tensor(tensor):
+    """Normalize a tensor to the range [0, 1]."""
+    min_val = torch.min(tensor)
+    max_val = torch.max(tensor)
+    return (tensor - min_val) / (max_val - min_val)
+
+
+def calculate_scores(Wout, weights, acts):
+    """Calculate and sum up the scores."""
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    Wout = Wout.to(device)
+    weights = weights.to(device)
+    acts = acts.to(device)
+
+    min_acts = torch.min(acts, dim=-1).values
+    max_acts = torch.max(acts, dim=-1).values
+    norm_acts = (acts - min_acts.unsqueeze(-1).expand_as(acts)) / \
+        (max_acts - min_acts).unsqueeze(-1).expand_as(acts)
+
+    score = torch.sum(norm_acts * Wout * weights, dim=-1)
+    scores_sum = score.sum(dim=0)
+    # scores_sum：(8，32，16384)
+    return scores_sum
+
 def pic_attr(model, weight, act):
-    # get each layer's Wout：（32，16384，4096）
     Wout = getWout(model)
-    # (32, 16384, 4096)
-    if torch.cuda.is_available():
-        Wout = Wout.to(torch.device("cuda:0"))
-        weight = weight.to(torch.device("cuda:0"))
-        act = act.to(torch.device("cuda:0"))
-    else:
-        print("no device is avail")
-    act[0] = (act[0]-torch.min(act[0]))/(torch.max(act[0]) - torch.min(act[0]))
-    out = act[0].unsqueeze(-1)*Wout
-    scores = out*weight[0]
-    scores = torch.sum(scores, dim=2)
-    scores_sum = scores.unsqueeze(0)
-    for i in range(1, weight.shape[0]):   # (1,8)
-        act[i] = (act[i]-torch.min(act[i])) / \
-            (torch.max(act[i]) - torch.min(act[i]))
-        out = act[i].unsqueeze(-1)*Wout  # (32, 16384, 4096)
-        scores = out*weight[i]  # (32, 16384, 4096)
-        scores = torch.sum(scores, dim=2)
-        scores_sum = torch.cat((scores_sum, scores.unsqueeze(0)), dim=0)
-    # scores_sum：（8，32，16384）
-    return torch.sum(scores_sum, dim=0)
+    result = calculate_scores(Wout, weight, act)
+    return result
 
 
 if __name__ == "__main__":
@@ -60,3 +74,5 @@ if __name__ == "__main__":
 
     # 4. calculate the attribution of all neurons to the generated image
     neuron_attribution = pic_attr(llm_backbone, attribution, act)
+
+    torch.save(neuron_attribution, 'path_to_the_neuron_attribution')

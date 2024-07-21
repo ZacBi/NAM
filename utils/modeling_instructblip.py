@@ -1545,7 +1545,7 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel):
         # print(qformer_input_ids)
         # print(qformer_attention_mask)
 
-        
+
         # step 1: forward the images through the vision encoder,
         # to get image embeddings of shape (batch_size, seq_len, hidden_size)
         vision_outputs = self.vision_model(
