@@ -62,11 +62,12 @@ def process_attribution(data_rows: List[DataRow], ratio_list: torch.Tensor = tor
     # num_tokens = number of img[0 - 8] = 8
     num_tokens, num_layers, dim_ffn = data_rows[0].shape
 
-    # 加载所有归因数据并仅保留第一个图像的归因, take attribution of img0
+    # 加载所有归因数据并仅保留img0的归因, take attribution of img0
+
     attribution = [torch.load(row.attribution_pth)[0] for row in data_rows]
-    # default : dim = 0
+    # default : dim = 0, (batch_size, num_layer, dim_h)
     attribution = torch.stack(attribution)
-    # sorted attributiion, indices
+    # sorted attributiion, indices shape: (batch_size, num_layer, dim_h), value of each cell is index(int)
     _, indices = torch.sort(attribution, dim=-1)
 
     seq_statistics = []
@@ -77,6 +78,7 @@ def process_attribution(data_rows: List[DataRow], ratio_list: torch.Tensor = tor
             top_k_attribution = attribution[:, layer_idx, :top_k].view(-1)
 
             # 直接获取唯一值及其出现次数，无需额外排序步骤 [[1, 2], [2, 3]] = [1, 2, 3], [1, 2, 1]
+            # 取batch中,每一层神经元中,索引的计数
             unique_values, counts = torch.unique(
                 top_k_attribution, return_counts=True)
 
