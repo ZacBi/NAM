@@ -3,6 +3,7 @@
 # 先做IMG0-IMG7的纯激活值
 # 32：16次生IMG0-IMG7 17,18
 from transformers import AutoTokenizer
+from torch.cuda.amp import autocast
 import torch
 import glob
 import os
@@ -14,7 +15,7 @@ path_wout = '/data/ruip/eva02/gill_done/Wout_Wreadout/Wout.pt'
 path_wreadout = '/data/ruip/eva02/gill_done/Wout_Wreadout/Wreadout.pt'
 file_paths = glob.glob(os.path.join(base_path, pattern))
 def get_WoutWread(model):
-    Wreadout_t = model.lm.lm_head.weight.t()
+    Wreadout_t = model.lm.lm_hWead.weight.t()
     Wout_t = model.lm.model.decoder.layers[0].fc2.weight.t()  # Assuming you are using the first layer for simplicity
     proj = Wout_t.mm(Wreadout_t).unsqueeze(0)  # Add a new dimension at the beginning
     for i in range(1, 32): # todo 优化
@@ -34,7 +35,7 @@ def plot_overlap_counts(top_k_indices, save_dir):
         plt.ylabel('Frequency')
         plt.title(f'Frequency of Count Values for Top {k}')
         plt.legend()
-        save_path = os.path.join(save_dir, f'MAX.png')
+        save_path = os.path.join(save_dir, f'MAX_{k}.png')
         plt.savefig(save_path)
         plt.close()
 def pic_value_mean(paths,save_dir):
@@ -279,10 +280,41 @@ def calculate_scores(Wout, weights, acts): # 如果输入的acts的结构是(10,
     scores_sum = score.mean(dim=1) #(10,8,32,16384)
     # scores_sum：(8，32，16384), 这里输出的结果应该是(10,32,16384)
     return scores_sum
+# 如果本身Wout张量（32，16384，4096）很少，acts：（10，8，32，16384）：80MB左右；weights：（10，8，4096） (10,8,32,16384,4096),(10,8,32,16384)
+# 先是Wout，weights两个张量相乘（10，8，32，16384，4096）
+# 最后一个加和得到
+def calculate_scores_1(Wout, weights, acts):
+    """Calculate and sum up the scores."""
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    Wout = Wout.to(device)
+    weights = weights.to(device)
+    acts = acts.to(device)
+    # Initialize an empty list to store scores for each sample
+    num_samples = weights.shape[0]
+    num_inner = weights.shape[1]
+    mid_tensors_s = torch.zeros(num_samples, num_inner, 32, 16384)
+    print("1",num_samples) # 10
+    print("2",num_inner) # 8
+    for i in range(num_samples):
+        for j in range(num_inner):
+            # 计算中间张量
+            mid_tensor = torch.sum(Wout * weights[i][j], dim=-1)  # 结果为 (32, 16384)
+            # 存储到预分配的张量中
+            mid_tensors_s[i, j] = mid_tensor  # 直接索引存储
+    # mid_tensors_s：（10，8，32，16384）
+    min_acts = torch.min(acts, dim=-1).values
+    max_acts = torch.max(acts, dim=-1).values
+    norm_acts = (acts - min_acts.unsqueeze(-1).expand_as(acts)) / \
+        (max_acts - min_acts).unsqueeze(-1).expand_as(acts)
+    #（10，8，32，16384）
+    mid_tensors_s = mid_tensors_s.to(device)
+    print("mid_size:",mid_tensors_s.size())
+    scores_sum = torch.mean(mid_tensors_s * norm_acts, dim = 1)
+    return scores_sum
 
 def pic_attr(file_path, weight, act):# 直接从路径上加载Wout
     Wout = torch.load(file_path)
-    result = calculate_scores(Wout, weight, act)
+    result = calculate_scores_1(Wout, weight, act)
     return result
 # max方法
 def pic_value_mean(act):
@@ -290,6 +322,7 @@ def pic_value_mean(act):
     # tensors = [torch.unsqueeze(torch.load(file_path), 0) for file_path in file_paths]
     stack_tensor = torch.cat(tensors, dim=0).permute(1, 0, 2, 3)
     stack_tensor = torch.mean(stack_tensor, dim=0) # (10,32,16384)
+    return stack_tensor
 def max_both(model, weight, act):
     score_1 = pic_attr(model, weight, act)
     score_2 = pic_value_mean(act)
@@ -298,6 +331,8 @@ def max_both(model, weight, act):
 def max_IMG(path, weight, act):
     score_1 = pic_attr(path, weight, act)
     score_2 = pic_value_mean(act)
+    print(score_1.size())
+    print(score_2.size())
     score = torch.max(score_1,score_2) # (10,32,16384)
     top_k_indices = {}
     for k in [50, 100, 500]:
@@ -309,8 +344,8 @@ def max_IMG(path, weight, act):
         # 合并所有索引并统计重合次数
         all_indices = torch.cat(top_k_indices[k])
         unique_indices, counts = all_indices.unique(return_counts=True)
-        row_indices = unique_indices // stack_tensor.shape[2]
-        col_indices = unique_indices % stack_tensor.shape[2]
+        row_indices = unique_indices // score.shape[2]
+        col_indices = unique_indices % score.shape[2]
         unique_indices_2d = torch.stack((row_indices, col_indices), dim=1)
         top_k_indices[k] = (unique_indices_2d, counts)
     # 打印前50个最大值的索引及其重合次数
