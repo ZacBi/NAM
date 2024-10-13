@@ -79,6 +79,8 @@ def pic_value_mean(path, save_dir):
     plot_overlap_counts(top_k_indices, save_dir)
 
 # 只统计IMG0=
+
+
 def pic_value_img0(paths, save_dir):
     # 加载并处理张量
     tensors = [torch.unsqueeze(torch.load(file_path), 0)
@@ -200,9 +202,11 @@ def pic_value_Wout(path, save_dir, path_wout):
 
 
 def pic_value_Wout0(path, save_dir, path_wout, topk):
-    tensors = [torch.unsqueeze(torch.load(file_path), 0) for file_path in file_paths]
+    tensors = [torch.unsqueeze(torch.load(file_path), 0)
+               for file_path in file_paths]
     # filp batch_size and img_token_num
-    stack_tensor = torch.cat(tensors, dim=0).permute(1, 0, 2, 3)  # (8,10,32,16384)
+    stack_tensor = torch.cat(tensors, dim=0).permute(
+        1, 0, 2, 3)  # (8,10,32,16384)
     stack_tensor = stack_tensor[0]  # (10,32,16384)
 
     wout = torch.load(path_wout)  # (32,16384,4096)
@@ -344,11 +348,11 @@ def max_both(model, weight, act):
 
 def max_IMG(path, weight, act, topK: Union[float, List[float]] = 0.1):
     score_1 = pic_attr(path, weight, act)
-    score_2 = pic_value_mean(act) 
+    score_2 = pic_value_mean(act)
     score = torch.max(score_1, score_2)  # (10,32,16384)
     top_k_indices = {}
     for k in [50, 100, 500]:
-        top_k_indices[k] = [] 
+        top_k_indices[k] = []
         for tensor in score:
             values, indices = torch.topk(tensor.view(-1), k)
             top_k_indices[k].append(indices)

@@ -50,37 +50,34 @@ def load_json_as_class_list(json_file_path: str, cls) -> List:
 
 
 # 需要考虑如何计算n个向量(集合)的相似度
-def process_attribution(data_rows: List[DataRow], ratio_list: torch.Tensor = torch.arange(0.1, 1.1, 0.1)) -> None:
+def process_attribution(attribution, ratio_list: torch.Tensor = torch.arange(0.1, 1.1, 0.2), prefix: str = 'default') -> None:
     """
     处理归因数据并生成统计信息
     Args:
         data_rows (List[DataRow]): 数据行列表
     """
-    if not data_rows:
-        raise ValueError('未找到任何数据权重行')
+    if attribution is None:
+        raise ValueError('no attribution found')
 
     # num_tokens = number of img[0 - 8] = 8
-    num_tokens, num_layers, dim_ffn = data_rows[0].shape
+    batch_size, num_tokens, num_layers, dim_ffn = attribution.shape
 
     # 加载所有归因数据并仅保留img0的归因, take attribution of img0
+    # TODO: 需要作为可可选项
+    attribution = attribution[:, 0, :, :]
 
-    attribution = [torch.load(row.attribution_pth)[0] for row in data_rows]
-    # default : dim = 0, (batch_size, num_layer, dim_h)
-    attribution = torch.stack(attribution)
-    # sorted attributiion, indices shape: (batch_size, num_layer, dim_h), value of each cell is index(int)
-    _, indices = torch.sort(attribution, dim=-1)
 
     seq_statistics = []
     ratio_layer_stat_table = {}
     for ratio in ratio_list:
         top_k = int(dim_ffn * ratio)
+        _, top_k_indices = torch.topk(attribution, top_k, dim=-1)
         for layer_idx in range(num_layers):
-            top_k_attribution = attribution[:, layer_idx, :top_k].view(-1)
 
             # 直接获取唯一值及其出现次数，无需额外排序步骤 [[1, 2], [2, 3]] = [1, 2, 3], [1, 2, 1]
             # 取batch中,每一层神经元中,索引的计数
-            unique_values, counts = torch.unique(
-                top_k_attribution, return_counts=True)
+            layer_top_k_indices = top_k_indices[:, layer_idx, :].reshape(-1)
+            unique_values, counts = torch.unique(layer_top_k_indices, return_counts=True)
 
             # 将值和计数配对，并按计数降序排序
             # 注意：这里先将unique_values和counts转换为tuple列表，然后排序，最后再分开
@@ -98,14 +95,14 @@ def process_attribution(data_rows: List[DataRow], ratio_list: torch.Tensor = tor
                                     top_k=top_k,
                                     neuron_indices=sorted_values,
                                     counts=sorted_counts,
-                                    norm_counts=sorted_counts / num_tokens)
+                                    norm_counts=[i / batch_size for i in sorted_counts])
             seq_statistics.append(stat_row)
             key = f'{ratio}_{layer_idx}'
             ratio_layer_stat_table[key] = stat_row
 
     # 保存统计信息至文件
-    torch.save(seq_statistics, 'seq_statistic.pth')
-    torch.save(ratio_layer_stat_table, 'statistic_table.pth')
+    torch.save(seq_statistics, f'{prefix}_seq_statistic.pth')
+    torch.save(ratio_layer_stat_table, f'{prefix}_statistic_table.pth')
 
 
 if __name__ == '__main__':
